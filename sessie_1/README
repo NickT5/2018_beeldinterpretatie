@@ -1,0 +1,13 @@
+README van sessie_1:
+
+INHOUD:
+	2 projecten (sessie_1_opdr1 en sessie_1_opdr2)
+		sessie_1_opdr1: thresholding, histogram equalization, clahe
+
+
+HOW TO RUN sessie_1_opdr1:
+	Ga naar de map "2018_beeldinterpretatie_todts_nick/sessie_1/sessie_1_opdr1/bin/Debug"
+	en voer het volgende commando uit:
+	./sessie_1_opdr1 -i=../../imageColor.jpg -j=../../imageBimodal.jpg
+
+	
