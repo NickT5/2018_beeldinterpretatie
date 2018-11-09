@@ -1,0 +1,19 @@
+README van sessie_2:
+
+INHOUD:
+	Segmentatie in RGB space
+	Segmentatie in HSV space met trackbars
+
+OPMERKING:
+	Programma sluiten doe je met ESC (om uit de while lus te gaan).
+	HSV segmentatie gebeurt enkel op de 1ste afbeelding die met de command line parser wordt 
+        meegeven.
+
+HOW TO RUN:
+	Ga naar de map "2018_beeldinterpretatie_todts_nick/sessie_2/bin/Debug"
+	en voer het volgende commando uit:
+
+	./sessie_2 -i=../../sign.jpg -j=../../sign2.jpg -k=../../sign3.jpg -l=../../sign4.jpg
+
+	
+
