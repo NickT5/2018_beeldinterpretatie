@@ -1,0 +1,11 @@
+READ ME van sessie_3:
+
+INHOUD:
+	Template matching voor 1 bounding box.
+	Template matching voor meerdere BB's.
+
+HOW TO RUN:
+	Ga naar de map "2018_beeldinterpretatie_todts_nick/sessie_3/bin/Debug" en voer het 		volgende commando uit:
+
+	./sessie_3 -i=../../recht.jpg -j=../../template.jpg -k=../../rot.jpg
+
