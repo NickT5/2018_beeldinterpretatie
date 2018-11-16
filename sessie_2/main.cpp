@@ -5,8 +5,6 @@
 using namespace std;
 using namespace cv;
 
-#define AANTAL 4
-
 ///Globale variabelen voor drie trackbars:
 int alpha_slider_1 = 13;               //Stored value of trackbar.
 const int alpha_slider_max_1 = 180;     //Max value of trackbar.
@@ -92,10 +90,6 @@ int main(int argc, char** argv)
     split(inputImg3,bgr3);
     split(inputImg4,bgr4);
 
-    //Mat B = bgr[0];
-    //Mat G = bgr[1];
-    //Mat R = bgr[2];
-
     ///Leeg masker maken voor elk verkeersbord.
     Mat mask_sign = Mat::zeros(inputImg1.rows, inputImg1.cols, CV_8UC1);
     Mat mask_sign2 = Mat::zeros(inputImg2.rows, inputImg2.cols, CV_8UC1);
@@ -118,7 +112,7 @@ int main(int argc, char** argv)
     ///Nu het gecreeerde masker gebruiken om geen zwart wit afbeelding te hebben,
     ///maar wel een img met enkel het rood van het stopbord.
     ///Dus elk gesplitst kanaal vermenigvuldigen met het masker en terug samenvoegen:
-    ///Dit doen voor elk masker
+    ///Dit doen voor elk masker:
     Mat tmp_1  = bgr[0] & mask_sign;
     Mat tmp2_1 = bgr[1] & mask_sign;
     Mat tmp3_1 = bgr[2] & mask_sign;
@@ -166,7 +160,7 @@ int main(int argc, char** argv)
     //Nadeel, segmenteren in RGB space: moeilijk om 1 tint te segmenteren en moeilijk om een universele te hebben.
 
 ///Opdracht 2: Segmenteer de verkeersborden in de HSV kleurenruimte
-    ///Eerste foto van CLP wordt gebruikt tijdens HSV segmentatie
+    ///Opmerking: eerste foto van CLP wordt gebruikt tijdens HSV segmentatie. De rest niet.
 
     ///Convert to HSV space.
     Mat hsvImage = Mat::zeros(inputImg1.rows, inputImg1.cols, CV_8UC3);
@@ -206,7 +200,7 @@ int main(int argc, char** argv)
     /*******/
 
     while(1){
-        ///Slider waarden toepassen
+        ///Slider waarden toepassen op de maskers
         //inRange() alternatief voor threshold()
         inRange(H, hueLow, 180, mask_hLow);
         inRange(H, 0, hueUp, mask_hUpper);
@@ -216,11 +210,58 @@ int main(int argc, char** argv)
         Mat mask_combined = Mat::zeros(hsvImage.rows, hsvImage.cols, CV_8UC1);
         mask_combined = (mask_hLow | mask_hUpper) & mask_sat;
 
-        //imshow("Voor opening", mask_combined);
+        //imshow("Voor opening", mask_combined);        //DEBUG
         ///Opening (= erosion + dilation) om ruis te verminderen
         erode(mask_combined, mask_combined, kernelErosion);
         dilate(mask_combined, mask_combined, kernelDilation);
-        //imshow("Na opening", mask_combined);
+        //imshow("Na opening", mask_combined);          //DEBUG
+
+        ///FindContours
+        Mat contourMap = Mat::zeros(mask_combined.rows, mask_combined.cols, CV_8UC3);
+        vector<vector<Point> > contours;
+        vector<Vec4i> hierarchy;  //contains info about img toplogy. Aantal evengroot als aantal countours.
+
+        findContours(mask_combined,contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE);
+
+        ///Zoek grootste blob (verkeersbord)
+        vector<Point> grootste_blob = contours[0];
+        for(unsigned int i=0; i< contours.size(); i++)
+        {
+            if(contourArea(contours[i]) > contourArea(grootste_blob))
+            {
+                grootste_blob = contours[i];
+            }
+        }
+        Rect roi = boundingRect(grootste_blob);
+        Mat blob = inputImg1(roi);
+        imshow("Grootste blob", blob);
+
+        int idx;
+        for(idx=0 ; idx >= 0; idx = hierarchy[idx][0])
+        {
+            Scalar color(rand()&255, rand()&255, rand()&255);
+            drawContours(contourMap, contours, idx, color, 8, FILLED, hierarchy);
+        }
+        ///Toon resultaat van findContours
+        imshow("Contours", contourMap);
+
+        ///convexHull() function checks a curve for convexity defects and corrects it.
+        Mat hull_result = Mat::zeros(mask_combined.rows, mask_combined.cols, CV_8UC3);
+        vector<vector<Point> >hull( contours.size() );
+
+        //Find the convex hull for each contour.
+        for( size_t i = 0; i < contours.size(); i++ )
+        {
+            convexHull( Mat(contours[i]), hull[i], false); //false staat voor clockwise orientatie vd hull.
+        }
+        //Draw the hull results.
+        for( size_t i = 0; i< contours.size(); i++ )
+        {
+            Scalar color = Scalar( rand()&255, rand()&255, rand()&255 );
+            drawContours( hull_result, hull, (int)i, color, 1, 8, vector<Vec4i>(), 0, Point() );
+        }
+        imshow("Convex hull", hull_result);
+
 
         ///Combined masker toepassen op de BGR kanalen.
         Mat B_masked = bgr[0] & mask_combined;
