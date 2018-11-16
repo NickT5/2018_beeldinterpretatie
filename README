@@ -1,0 +1,7 @@
+Algemene README
+
+CONTENT:
+	sessie_0: introductie
+	sessie_1: thresholding, histogram equal, erosie, dilatie, contours, convexhull
+	sessie_2: color space manipulation
+	sessie_3: template matching
