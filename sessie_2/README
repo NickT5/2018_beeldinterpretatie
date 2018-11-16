@@ -9,6 +9,8 @@ OPMERKING:
 	HSV segmentatie gebeurt enkel op de 1ste afbeelding die met de command line parser wordt 
         meegeven.
 
+	De output windows zijn: My Window, countours, convexhull en grootste blob.
+
 HOW TO RUN:
 	Ga naar de map "2018_beeldinterpretatie_todts_nick/sessie_2/bin/Debug"
 	en voer het volgende commando uit:
