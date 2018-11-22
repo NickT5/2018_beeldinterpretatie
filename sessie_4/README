@@ -1,0 +1,10 @@
+README van sessie_4
+
+HOW TO RUN:
+	Ga naar de map "2018_beeldinterpretatie_todts_nick/sessie_4/bin/Debug" 
+	en voer het volgende commando uit:
+	./sessie_4 -i=../../fitness_image.png -j=../../fitness_object.png -k=../../kinderbueno_image.png -l=../../kinderbueno_object.png
+
+
+INHOUD:
+	Keypoint detection and matching
