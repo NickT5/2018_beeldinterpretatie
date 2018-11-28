@@ -5,3 +5,4 @@ CONTENT:
 	sessie_1: thresholding, histogram equal, erosie, dilatie, contours, convexhull
 	sessie_2: color space manipulation
 	sessie_3: template matching
+	sessie_4: keypoint detection and matching
