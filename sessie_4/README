@@ -7,4 +7,4 @@ HOW TO RUN:
 
 
 INHOUD:
-	Keypoint detection and matching
+	Keypoint detection (ORB, BRISK, AKAZE) and brute force matching (Norm L2) and RANSAC
