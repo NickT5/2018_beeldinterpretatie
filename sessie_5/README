@@ -1,0 +1,9 @@
+README van sessie_5:
+
+HOW TO RUN:
+	Ga naar de map "2018_beeldinterpretatie_todts_nick/sessie_5/bin/Debug" en voer het 		volgende commando uit: 
+	./sessie_5 -i=../../strawberry1.tif -j=../../strawberry2.tif
+
+
+INHOUD:
+	Machine learning. kNN, Normal Bayes en SVM classifiers trainen door data te verzamelen a.d.h.v. mouseclick events. Vervolgens een prediction maken om rijpe aardbeien te detecteren.
