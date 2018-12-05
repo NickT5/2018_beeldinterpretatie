@@ -132,7 +132,7 @@ int main(int argc, const char **argv)
     vconcat(labelsVoorgrond, labelsAchtergrond, labels);                    //vertical concatination
 
     ///Train de classifiers (kNN, Normal Bayes, SVM):
-    cout << "Train a kNN Classifier ..." << endl;
+    cout << endl << "Train a kNN Classifier ..." << endl;
     Ptr<KNearest> kNN = KNearest::create();
     Ptr<TrainData> trainingdataKNN = TrainData::create(trainingData, ROW_SAMPLE, labels);
     kNN->setIsClassifier(true);
@@ -142,7 +142,8 @@ int main(int argc, const char **argv)
 
     cout << "Train a Normal Bayer Classifier ..." << endl;
     Ptr<NormalBayesClassifier> normalBayes = NormalBayesClassifier::create();
-    normalBayes->train(trainingData, ROW_SAMPLE, labels);
+    Ptr<TrainData> trainingdataBayes = TrainData::create(trainingData, ROW_SAMPLE, labels);
+    normalBayes->train(trainingdataBayes);
 
     cout << "Train a Support Vector Machine Classifier ..." << endl;
     Ptr<SVM> svm = SVM::create();
@@ -157,7 +158,7 @@ int main(int argc, const char **argv)
     Mat mask_SVM            = Mat::zeros(img.rows,img.cols,CV_8UC1);
 
     ///Variabele definiëren voor de pixel prediction voor elke CLF.
-    Mat prediction_kNN, prediction_normalBayes, prediction_SVM;
+    Mat prediction_kNN, outputBayes, outputProbBayes, prediction_SVM;
 
     ///Itereer over elke pixel van de image.
     for(int i=0;i<img.rows;i++){
@@ -171,12 +172,15 @@ int main(int argc, const char **argv)
 
             ///Predict pixel
             kNN->findNearest(data_test, kNN->getDefaultK(), prediction_kNN);
-            normalBayes->predict(data_test, prediction_normalBayes);    //juiste predict?
+            normalBayes->predictProb(data_test, outputBayes, outputProbBayes);
             svm->predict(data_test, prediction_SVM);
+
+            //debug
+            //if(outputBayes.at<float>(0,0) != 0) cout << outputBayes.at<float>(0,0)  << "  ";
 
             ///Maskers invullen op basis van de pixel prediction.
             mask_kNN.at<uchar>(i,j)         = prediction_kNN.at<float>(0,0);
-            mask_normalBayes.at<uchar>(i,j) = prediction_normalBayes.at<float>(0,0);
+            mask_normalBayes.at<uchar>(i,j) = outputBayes.at<float>(0,0);
             mask_SVM.at<uchar>(i,j)         = prediction_SVM.at<float>(0,0);
         }
     }
