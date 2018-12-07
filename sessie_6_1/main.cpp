@@ -63,6 +63,9 @@ int main(int argc, char** argv)
     else{ cout << "Successfully loaded the LBP CLF." << endl; }
 
 
+    ///Skip the intro of the video.
+    video.set(CAP_PROP_POS_FRAMES, 52);
+
     Mat frame;
     ///Take a frame from the video capture each iteration until ESC is pressed.
     while( true ){
