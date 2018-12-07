@@ -77,10 +77,52 @@ int main(int argc, char** argv)
             return 0;
         }
 
-        imshow("Frame", frame);
+        ///Clone the frame.
+        Mat tempHAAR = frame.clone();
+        Mat tempLBP = frame.clone();
+
+        ///Vector of rectangles where each rectangle contains the detected object,
+        /// the rectangles may be partially outside the original image.
+        vector<Rect> objectsHAAR, objectsLBP;
+
+        ///Vector of detection numbers for the corresponding objects.
+        ///An object’s number of detections is the number of neighboring positively
+        /// classified rectangles that were joined together to form the object.
+        vector<int> scoreHAAR, scoreLBP;
+
+        ///Extra parameters voor de .detectMultiScale() functie.
+        double scaleFactor=1.1;
+        int minNeighbors=3;
+
+        ///Detects objects of different sizes in the input image.
+        ///The detected objects are returned as a list of rectangles.
+        detectorHAAR.detectMultiScale(tempHAAR, objectsHAAR, scoreHAAR, scaleFactor, minNeighbors);
+        detectorLBP.detectMultiScale(tempLBP, objectsLBP, scoreLBP, scaleFactor , minNeighbors);
+
+        Mat canvas = frame.clone();
+
+        ///Teken de resultaten van de HAAR detector.
+        for(unsigned int i = 0; i < objectsHAAR.size(); i++){
+            circle(canvas, Point(objectsHAAR[i].x+objectsHAAR[i].width/2, objectsHAAR[i].y+objectsHAAR[i].height/2), objectsHAAR[i].width/2, Scalar(0, 0, 255));
+            stringstream temp;
+            temp << (int)scoreHAAR[i];
+            putText(canvas, temp.str(), Point(objectsHAAR[i].x, objectsHAAR[i].y), FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 255));
+        }
+
+        ///Teken de resultaten van de LBP detector.
+        for(unsigned i = 0; i < objectsLBP.size(); i++){
+            rectangle(canvas, objectsLBP[i], Scalar(0, 255, 0), 2);
+            stringstream temp;
+            temp << (int)scoreLBP[i];
+            putText(canvas, temp.str(), Point(objectsLBP[i].x, objectsLBP[i].y), FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
+        }
+
+        ///Opm: De CLF's zijn niet rotatie-invariant. Bij scheve poses is er geen detectie.
+       // imshow("Frame", frame);
+        imshow("Canvas", canvas);
 
         ///Press ESC on keyboard to exit.
-        char c = (char)waitKey(25);
+        char c = (char)waitKey(30);
         if(c==27){
             break;
         }
