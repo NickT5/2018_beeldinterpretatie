@@ -121,6 +121,8 @@ int main(int argc, char** argv)
         }
 
         ///Opm: De CLF's zijn niet rotatie-invariant. Bij scheve poses is er geen detectie.
+        ///Verschil tussen HAAR en LBP: LBP heeft een kleinere accurancy, maar is tot 4x sneller. (=tradeoff)
+
        // imshow("Frame", frame);
         imshow("Canvas", canvas);
 
