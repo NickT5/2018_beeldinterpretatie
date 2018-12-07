@@ -1,0 +1,5 @@
+# depslib dependency file v1.0
+1544165959 source:/home/nick/Documents/2018_beeldinterpretatie_todts_nick/sessie_6_1/main.cpp
+	<iostream>
+	<opencv2/opencv.hpp>
+
