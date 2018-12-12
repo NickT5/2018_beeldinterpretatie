@@ -7,3 +7,5 @@ CONTENT:
 	sessie_3: template matching
 	sessie_4: keypoint detection and matching
 	sessie_5: machine learning (kNN, normal Bayes, SVM)
+	sessie_6_1: Face detector (HAAR, LBP)
+	sessie_6_2: Person detector (HOG+SVM)
