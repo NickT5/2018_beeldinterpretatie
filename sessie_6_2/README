@@ -1,0 +1,8 @@
+README van sessie_6 deel 2
+
+HOW TO RUN: 
+	ga naar de map "2018_beeldinterpretatie_todts_nick/sessie_6_2/bin/Debug" en voer het 		volgende commando uit:
+	./sessie_6_2 -v=../../people.mp4
+
+INHOUD:
+	Video afspelen, persoon detecteren (a.d.h.v. HOG+SVM) en zijn pad tracken.

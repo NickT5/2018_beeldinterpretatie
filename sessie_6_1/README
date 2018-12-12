@@ -1,0 +1,9 @@
+README van sessie_6 deel 1
+
+HOW TO RUN: 
+	ga naar de map "2018_beeldinterpretatie_todts_nick/sessie_6_1/bin/Debug" en voer het 		volgende commando uit:
+./sessie_6_1 -v=../../faces.mp4 -a=../../haarcascade_frontalface_alt.xml -l=../../lbpcascade_frontalface_improved.xml
+
+
+INHOUD:
+	Video afspelen en gezichten detecteren (a.d.h.v. een HAAR en LBP classifier).
