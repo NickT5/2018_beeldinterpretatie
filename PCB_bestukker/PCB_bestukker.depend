@@ -1,0 +1,5 @@
+# depslib dependency file v1.0
+1544800289 source:/home/nick/Documents/2018_beeldinterpretatie_todts_nick/PCB_bestukker/main.cpp
+	<iostream>
+	<opencv2/opencv.hpp>
+
