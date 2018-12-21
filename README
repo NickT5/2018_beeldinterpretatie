@@ -9,3 +9,7 @@ CONTENT:
 	sessie_5: machine learning (kNN, normal Bayes, SVM)
 	sessie_6_1: Face detector (HAAR, LBP)
 	sessie_6_2: Person detector (HOG+SVM)
+	sessie 7: NVIDIA course: Deep learning classification (geen code op GitHub)
+	sessie 8: NVIDIA course: Deep learning detection + localization (geen code op GitHub)
+
+	PCB_bestukker: Dit is het project voor de praktische evaluatie.
