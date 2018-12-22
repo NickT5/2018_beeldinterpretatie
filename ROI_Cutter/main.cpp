@@ -8,8 +8,10 @@ using namespace cv;
 Point startPoint, currentPoint, endPoint;
 ///Global variable to know in which state the program is. Recording or not-recording.
 bool recordingState = false;
-///Global variable to decide when to create a roi from the drawn rectangle.
+///Global variable to decide when to close the program.
 bool stopProgram = false;
+
+bool takeROI = false;
 
 ///Global variable to keep track on how many rectangles were drawn.
 /// This will be used to make a unique name for each roi image.
@@ -41,19 +43,14 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
         endPoint.y = y;
         cout << "End point: " << endPoint.x << ";" << endPoint.y << endl;
         recordingState = false; ///Change the recording state to FALSE.
-        numRectangles++;
-
     }
 
     if ( event == EVENT_RBUTTONDOWN)
     {
-        ///Reset all positions.
-        startPoint.x = 0;   startPoint.y = 0;
-        currentPoint.x = 0;   currentPoint.y = 0;
-        endPoint.x = 0;   endPoint.y = 0;
+        numRectangles++;
+        takeROI = true;
     }
 
-    ///Mss nog een defenitieve keuze bevestig knop?
     if (event == EVENT_MBUTTONDOWN)
     {
         stopProgram = true;
@@ -66,6 +63,13 @@ int main(int argc, const char **argv)
     cout << "ROI cutter!" << endl;
     cout << "Draw a rectangle and save that ROI as a seperate image." << endl;
     cout << "Create a new image per drawn rectangle." << endl;
+    cout << "********************USAGE********************" << endl;
+    cout << "Left mouse button down  : select start point." << endl;
+    cout << "Left mouse button up    : select end point." << endl;
+    cout << "Right mouse button down : confirm roi and create a roi." << endl;
+    cout << "Middle mouse button down: close program." << endl;
+    cout << "Roi images are saved in the 'output' directory." << endl;
+    cout << "********************************************" << endl;
 
      ///Setup CommandLineParser
     CommandLineParser parser(argc, argv,
@@ -122,11 +126,21 @@ int main(int argc, const char **argv)
         waitKey(30);
 
         ///Create a ROI.
-        //todo
+        if(takeROI)
+        {
+            ///Generate unique name for the ROI.
+            ostringstream roiName;
+            roiName << "../../output/roi_" << numRectangles << ".png";
+
+            cout << "Creating a new roi image: " << roiName.str() << endl;
+            Mat roi = Mat(inputImage, Rect(startPoint,endPoint));
+            imshow("roi", roi);
+            imwrite(roiName.str(), roi);
+            takeROI = false;
+        }
 
         ///Neem een nieuwe kloon zodat niet elke rechthoek ooit getekent wordt op de canvas.
         canvas = inputImage.clone();
-
     }
 
     if(stopProgram)
