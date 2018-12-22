@@ -9,7 +9,11 @@ Point startPoint, currentPoint, endPoint;
 ///Global variable to know in which state the program is. Recording or not-recording.
 bool recordingState = false;
 ///Global variable to decide when to create a roi from the drawn rectangle.
-bool createROI = false;
+bool stopProgram = false;
+
+///Global variable to keep track on how many rectangles were drawn.
+/// This will be used to make a unique name for each roi image.
+unsigned int numRectangles = 0;
 
 ///Callback function for mouse events.
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
@@ -20,6 +24,7 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
         startPoint.y = y;       ///Get the y-pos
         cout << "Start point: " << startPoint.x << ";" << startPoint.y << endl;
         recordingState = true;   ///Change the recording state to TRUE.
+        stopProgram = false;
 
     }
 
@@ -36,10 +41,23 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
         endPoint.y = y;
         cout << "End point: " << endPoint.x << ";" << endPoint.y << endl;
         recordingState = false; ///Change the recording state to FALSE.
-        createROI = true;
+        numRectangles++;
+
     }
 
-    ///Mss nog leuk voor een reset knop voor de start pos?
+    if ( event == EVENT_RBUTTONDOWN)
+    {
+        ///Reset all positions.
+        startPoint.x = 0;   startPoint.y = 0;
+        currentPoint.x = 0;   currentPoint.y = 0;
+        endPoint.x = 0;   endPoint.y = 0;
+    }
+
+    ///Mss nog een defenitieve keuze bevestig knop?
+    if (event == EVENT_MBUTTONDOWN)
+    {
+        stopProgram = true;
+    }
 
 }
 
@@ -47,6 +65,7 @@ int main(int argc, const char **argv)
 {
     cout << "ROI cutter!" << endl;
     cout << "Draw a rectangle and save that ROI as a seperate image." << endl;
+    cout << "Create a new image per drawn rectangle." << endl;
 
      ///Setup CommandLineParser
     CommandLineParser parser(argc, argv,
@@ -89,28 +108,34 @@ int main(int argc, const char **argv)
     ///Set the callback function for the mouse events.
     setMouseCallback(windowName, CallBackFunc, NULL);
 
-    while(!createROI){
+    while(!stopProgram){
         if(recordingState)
         {
              rectangle(canvas, startPoint, currentPoint, Scalar(0,240,255), 2); ///Syntax: img, hoekpunt, opposite hoekpunt, color,thickness ( -1 voor filled)
+        }
+        else{
+            rectangle(canvas, startPoint, endPoint, Scalar(0,0,255), 2);
         }
 
         ///Show canvas
         imshow(windowName, canvas);
         waitKey(30);
 
+        ///Create a ROI.
+        //todo
+
         ///Neem een nieuwe kloon zodat niet elke rechthoek ooit getekent wordt op de canvas.
         canvas = inputImage.clone();
 
     }
 
-    ///Create roi
-    if(createROI)
+    if(stopProgram)
     {
-        cout << "neem roi" << endl;
+        cout << "Closing program..." << endl;
+        waitKey(500);
     }
 
-    waitKey(0);
+
 
     return 0;
 }
