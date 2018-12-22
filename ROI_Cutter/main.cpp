@@ -8,6 +8,8 @@ using namespace cv;
 Point startPoint, currentPoint, endPoint;
 ///Global variable to know in which state the program is. Recording or not-recording.
 bool recordingState = false;
+///Global variable to decide when to create a roi from the drawn rectangle.
+bool createROI = false;
 
 ///Callback function for mouse events.
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
@@ -25,7 +27,7 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     {
         currentPoint.x = x;
         currentPoint.y = y;
-        cout << "Current point: " << currentPoint.x << ";" << currentPoint.y << endl;
+        //cout << "Current point: " << currentPoint.x << ";" << currentPoint.y << endl;
     }
 
     if( event == EVENT_LBUTTONUP)
@@ -34,7 +36,10 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
         endPoint.y = y;
         cout << "End point: " << endPoint.x << ";" << endPoint.y << endl;
         recordingState = false; ///Change the recording state to FALSE.
+        createROI = true;
     }
+
+    ///Mss nog leuk voor een reset knop voor de start pos?
 
 }
 
@@ -76,12 +81,34 @@ int main(int argc, const char **argv)
 
     ///Show the image
     string windowName = "Input image";
-    imshow(windowName, inputImage);
 
+    ///Clone the input image.
+    Mat canvas = inputImage.clone();
+    imshow(windowName, canvas);
 
     ///Set the callback function for the mouse events.
     setMouseCallback(windowName, CallBackFunc, NULL);
 
+    while(!createROI){
+        if(recordingState)
+        {
+             rectangle(canvas, startPoint, currentPoint, Scalar(0,240,255), 2); ///Syntax: img, hoekpunt, opposite hoekpunt, color,thickness ( -1 voor filled)
+        }
+
+        ///Show canvas
+        imshow(windowName, canvas);
+        waitKey(30);
+
+        ///Neem een nieuwe kloon zodat niet elke rechthoek ooit getekent wordt op de canvas.
+        canvas = inputImage.clone();
+
+    }
+
+    ///Create roi
+    if(createROI)
+    {
+        cout << "neem roi" << endl;
+    }
 
     waitKey(0);
 
