@@ -4,6 +4,15 @@
 using namespace std;
 using namespace cv;
 
+Mat rotate_image(Mat src, float angle)
+{
+    Mat dst;
+    Point2f src_center(src.cols/2.0F, src.rows/2.0F);
+    Mat rotationMatrix = getRotationMatrix2D(src_center, angle, 1.0);
+    warpAffine(src, dst, rotationMatrix, src.size());
+    return dst;
+}
+
 int main(int argc, const char **argv)
 {
     cout << "Project: PCB bestukker." << endl;
@@ -50,6 +59,14 @@ int main(int argc, const char **argv)
     ///Clone input images.
     Mat pcb = inputImages[0].clone();
     Mat templ = inputImages[1].clone();
+
+    ///Rotate image.
+    for(int i=90; i<360; i=i+90)
+    {
+        Mat r = rotate_image(templ,i);
+        imshow("r",r);
+        waitKey(0);
+    }
 
     ///Create Mat object for the result.
     Mat matchResult = Mat::zeros(pcb.rows, pcb.cols, CV_8UC1);
