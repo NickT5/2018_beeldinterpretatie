@@ -6,10 +6,21 @@ using namespace cv;
 
 Mat rotate_image(Mat src, float angle)
 {
-    Mat dst;
+  /*  Mat dst;
     Point2f src_center(src.cols/2.0F, src.rows/2.0F);
     Mat rotationMatrix = getRotationMatrix2D(src_center, angle, 1.0);
     warpAffine(src, dst, rotationMatrix, src.size());
+    return dst;
+    */
+    Mat dst;
+    Point2f center(src.cols/2.0, src.rows/2.0);
+    Mat rot = getRotationMatrix2D(center, angle, 1.0);
+    Rect bbox = RotatedRect(center,src.size(), angle).boundingRect();
+
+    rot.at<double>(0,2) += bbox.width/2.0 - center.x;
+    rot.at<double>(1,2) += bbox.height/2.0 - center.y;
+
+    warpAffine(src, dst, rot, bbox.size());
     return dst;
 }
 
@@ -72,7 +83,7 @@ int main(int argc, const char **argv)
     Mat original_templ = inputImages[1].clone();
 
 
-    for(int i=0; i<360; i=i+90)
+    for(int i=0; i<180; i=i+90)
     {
         ///Rotate template image.
         Mat templ = rotate_image(original_templ.clone(),i);
@@ -85,23 +96,25 @@ int main(int argc, const char **argv)
         ///For SQDIFF is the min value the best match. For CCORR and CCOEFF is the max value the best match.
         int match_method[] = {CV_TM_SQDIFF, CV_TM_SQDIFF_NORMED, CV_TM_CCORR, CV_TM_CCORR_NORMED, CV_TM_CCOEFF, CV_TM_CCOEFF_NORMED};
         matchTemplate(pcb, templ, matchResult, match_method[5]);
-        //imshow("matchResult", matchResult);
-        //waitKey(0);
+        imshow("matchResult", matchResult);
+        waitKey(0);
 
         ///Normalize
         normalize( matchResult, matchResult, 0, 1, NORM_MINMAX, -1, Mat() );
-        //imshow("(normalized) matchResult", matchResult);
-        //waitKey(0);
+        imshow("(normalized) matchResult", matchResult);
+        waitKey(0);
 
         ///Threshold
         Mat mask = Mat::zeros(matchResult.rows, matchResult.cols, CV_8UC1);
-        threshold(matchResult, mask, 0.77, 1, THRESH_BINARY);
+        threshold(matchResult, mask, 0.75, 1, THRESH_BINARY);
+        imshow("Threshold mask", mask);
+        waitKey(0);
 
         ///Erosion + dilation)
         erode(mask, mask, kernelErosion);
         dilate(mask, mask, kernelDilation);
-        //imshow("Threshold mask after erosion and dilation", mask);
-        //waitKey(0);
+        imshow("Threshold mask after erosion and dilation", mask);
+        waitKey(0);
 
         ///Convert [0;1] scale to [0;255]. (minMaxLoc expects a grayscale image as input.)
         mask.convertTo(mask,CV_8UC1);
