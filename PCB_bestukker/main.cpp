@@ -4,6 +4,98 @@
 using namespace std;
 using namespace cv;
 
+int threshold1;
+int alpha_slider_1 = 255;               //Stored value of trackbar.
+const int alpha_slider_max_1 = 255;     //Max value of trackbar.
+
+int threshold2;
+int alpha_slider_2 = 255;                //Stored value of trackbar.
+const int alpha_slider_max_2 = 255;     //Max value of trackbar.
+
+Mat canny;
+Mat pcb_gray;
+Mat pcb_houghlines;
+Mat pcb_origneel;
+
+//
+int th;
+int threshold_slider = 80;
+const int threshold_slider_max = 255;
+
+int minLineLength;
+int minLineLength_slider = 5;
+const int minLineLength_slider_max = 255;
+
+int maxLineGap;
+int maxLineGap_slider = 0;
+const int maxLineGap_slider_max = 255;
+//
+
+///Callback functions voor de trackbars:
+static void on_trackbar1(int, void*){
+    threshold1 = alpha_slider_1;
+    Canny(pcb_gray, canny, threshold1, threshold2, 3, true);
+}
+
+static void on_trackbar2(int, void*){
+    threshold2 = alpha_slider_2;
+    Canny(pcb_gray, canny, threshold1, threshold2, 3, true);
+}
+
+static void on_trackbar3(int, void*){
+    pcb_houghlines = pcb_origneel.clone();   //'Refresh' the output.
+
+    vector<Vec4i> lines;
+    th = threshold_slider;
+    minLineLength = minLineLength_slider;
+    maxLineGap = maxLineGap_slider;
+
+    HoughLinesP( canny, lines, 0.5, CV_PI/360, th, minLineLength, maxLineGap );
+
+    for( size_t i = 0; i < lines.size(); i++ )
+    {
+        line( pcb_houghlines, Point(lines[i][0], lines[i][1]), Point( lines[i][2], lines[i][3]), Scalar(0,0,255), 2);
+    }
+
+}
+
+
+void put_resistor(Mat src, Mat &dst, int x, int y)
+{
+    Mat resistor = imread("../../img/weerstand_10k.png");
+
+    dst = src.clone();
+
+    ///Place resistor on the PCB.
+    resistor.copyTo(dst(Rect(x, y, resistor.cols, resistor.rows)));
+
+}
+
+
+
+Mat get_line_mask(Mat src)
+{
+    Mat dst = src.clone();
+    Mat tmp = src.clone();
+
+    cvtColor(src, tmp, COLOR_BGR2GRAY);
+
+    Canny(tmp, dst, 50.0, 150.0, 3, true);
+
+    Mat color_dst;
+    cvtColor( dst, color_dst, COLOR_GRAY2BGR );
+
+    /*vector<Vec4i> lines;
+    HoughLinesP( dst, lines, 1, CV_PI/180, 80, 30, 10 );
+    for( size_t i = 0; i < lines.size(); i++ )
+    {
+        line( color_dst, Point(lines[i][0], lines[i][1]),
+        Point( lines[i][2], lines[i][3]), Scalar(0,0,255), 3, 8 );
+    }*/
+
+    return dst;
+}
+
 Mat rotate_image(Mat src, float angle)
 {
   /*  Mat dst;
@@ -27,6 +119,8 @@ Mat rotate_image(Mat src, float angle)
 int main(int argc, const char **argv)
 {
     cout << "Project: PCB bestukker." << endl;
+    bool setupCannyValues = true;
+    bool setupHoughLines = true;
 
     ///Setup CLP.
     CommandLineParser parser(argc, argv,
@@ -82,6 +176,60 @@ int main(int argc, const char **argv)
     Mat pcb = inputImages[0].clone();
     Mat original_templ = inputImages[1].clone();
 
+    canny = pcb.clone();
+    cvtColor(pcb.clone(), pcb_gray, COLOR_BGR2GRAY);
+
+    pcb_houghlines = pcb.clone();
+    pcb_origneel = pcb.clone();
+
+
+    ///Setup canny threshold values:
+    if(setupCannyValues)
+    {
+        namedWindow("canny", WINDOW_AUTOSIZE);
+        createTrackbar("Threshold 1", "canny", &alpha_slider_1, alpha_slider_max_1, on_trackbar1 );
+        createTrackbar("Threshold 2", "canny", &alpha_slider_2, alpha_slider_max_2, on_trackbar2 );
+        while(1)
+        {
+            ///Show canny edge detection result.
+            imshow("canny", canny);
+
+            ///Exit loop via "Esc" button on keyboard.
+            if (waitKey(1) == 27)   break;
+
+        }
+    }
+    else
+    {
+        cout << "Not using the trackbars to setup the canny edge detection threshold values. (boolean is FALSE)" << endl;
+        cout << "Using the default values for Canny." << endl;
+        Canny(pcb_gray, canny, threshold1, threshold2, 3, true);
+    }
+
+
+    if(setupHoughLines)
+    {
+        namedWindow("houghlines", WINDOW_AUTOSIZE);
+
+        createTrackbar("threshold", "houghlines", &threshold_slider, threshold_slider_max, on_trackbar3 );
+        createTrackbar("minLineLength", "houghlines", &minLineLength_slider, minLineLength_slider_max, on_trackbar3 );
+        createTrackbar("maxLineGap", "houghlines", &maxLineGap_slider, maxLineGap_slider_max, on_trackbar3 );
+        while(1)
+        {
+            imshow("houghlines", pcb_houghlines);
+
+            ///Exit loop via "Esc" button on keyboard.
+            if (waitKey(1) == 27)   break;
+        }
+
+    }
+    else
+    {
+        cout << "Not using the trackbars to setup the houghlinesp parameters. (boolean is FALSE)" << endl;
+    }
+
+
+    /*
 
     for(int i=0; i<180; i=i+90)
     {
@@ -157,6 +305,23 @@ int main(int argc, const char **argv)
         imshow("Result with multiple bounding boxes", result_multi);
         waitKey(0);
     }
+
+    */
+
+    cout << "test" << endl;
+
+
+/*  Mat canny = get_line_mask(pcb);
+    imshow("canny", canny);
+    waitKey(0);
+  */
+
+
+/*  Mat pcb_bestukked;
+    put_resistor(pcb, pcb_bestukked, 0 ,0);
+    imshow("r", pcb_bestukked);
+    waitKey(0);
+*/
 
     return 0;
 }
