@@ -9,7 +9,7 @@ int alpha_slider_1 = 255;               //Stored value of trackbar.
 const int alpha_slider_max_1 = 255;     //Max value of trackbar.
 
 int threshold2;
-int alpha_slider_2 = 255;                //Stored value of trackbar.
+int alpha_slider_2 = 255;               //Stored value of trackbar.
 const int alpha_slider_max_2 = 255;     //Max value of trackbar.
 
 Mat canny;
@@ -17,7 +17,7 @@ Mat pcb_gray;
 Mat pcb_houghlines;
 Mat pcb_origneel;
 
-//
+//Hough line variables:
 int th;
 int threshold_slider = 80;
 const int threshold_slider_max = 255;
@@ -45,13 +45,16 @@ static void on_trackbar2(int, void*){
 static void on_trackbar3(int, void*){
     pcb_houghlines = pcb_origneel.clone();   //'Refresh' the output.
 
+    ///Get values from the sliders.
     vector<Vec4i> lines;
     th = threshold_slider;
     minLineLength = minLineLength_slider;
     maxLineGap = maxLineGap_slider;
 
+    ///Apply HoughLinesP.
     HoughLinesP( canny, lines, 0.5, CV_PI/360, th, minLineLength, maxLineGap );
 
+    ///Draw the lines.
     for( size_t i = 0; i < lines.size(); i++ )
     {
         line( pcb_houghlines, Point(lines[i][0], lines[i][1]), Point( lines[i][2], lines[i][3]), Scalar(0,0,255), 2);
@@ -65,16 +68,16 @@ Point find_countour_center(Mat src, Mat mask)
     cout << "find_coutour_center()..." << endl;
 
     Mat contourMap = Mat::zeros(src.rows, src.cols, CV_8UC3);   //Gevonden countours hierop tekenen.
-    vector<vector<Point> > contours;    //each detected contour is stored as a vector of points.
-    vector<Vec4i> hierarchy;  //contains info about img toplogy. Aantal even groot als aantal countours.
+    vector<vector<Point> > contours;                            //each detected contour is stored as a vector of points.
+    vector<Vec4i> hierarchy;                                    //contains info about img toplogy. Aantal even groot als aantal countours.
 
+    ///findContours in the mask.
     //8bit img, contours, hierarchy, mode, method, offset
     //mode: CV_RETR_EXTERNAL, CV_RETR_LIST, CV_RETR_CCOMP, CV_RETR_TREE
     //method: CV_CHAIN_APPROX_NONE, CV_CHAIN_APPROX_SIMPLE, ...
     findContours(mask.clone(), contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE);
 
-    //iterate trough all the top-level contours,
-    //draw each connected conponent with its own random color
+    ///Draw each contour with a random color.
     int idx;
     for(idx=0 ; idx >= 0; idx = hierarchy[idx][0])
     {
@@ -82,11 +85,12 @@ Point find_countour_center(Mat src, Mat mask)
         drawContours(contourMap, contours, idx, color, FILLED, 8, hierarchy);
     }
 
+    ///Show the contours.
     imshow("Components (contours)", contourMap);
     waitKey(0);
 
 
-    ///Zoek grootste blob
+    ///Find the largest blob.
     vector<Point> grootste_blob = contours[0];
     for(unsigned int i=0; i< contours.size(); i++)
     {
@@ -96,8 +100,7 @@ Point find_countour_center(Mat src, Mat mask)
         }
     }
 
-
-    ///Zoek center van de grootste blob.
+    ///Find center of the largest blob.
     Rect br = boundingRect(grootste_blob);
     Point centerPoint = Point(br.x+br.width/2, br.y+br.height/2);
 
@@ -111,7 +114,7 @@ Mat create_mask(Mat src)
     ///Create a black mask.
     Mat mask = Mat::zeros(src.rows, src.cols, CV_8UC1);
 
-    ///Create a gray image.
+    ///Create a gray image of the PCB.
     Mat gray;
     cvtColor( src.clone(), gray, COLOR_BGR2GRAY );
     imshow("gray", gray);
@@ -120,24 +123,28 @@ Mat create_mask(Mat src)
     ///Apply binary threshold.
     threshold(gray, mask, 150, 255, THRESH_BINARY);
 
+    ///Show the mask.
     imshow("mask", mask);
     waitKey(0);
 
     return mask;
 }
 
-Mat search_region(Mat src, Point letter_location, int comp_size)
+Mat search_region(Mat src, Point letter_location, int w, int h)
 {
     cout << "search_region()..." << endl;
 
     Mat region;                     ///Regio waar lijnen in gedetecteerd moeten worden.
     Point tlPoint, brPoint;         ///Hoekpunten die een rechthoek definiëren. (topleft en bottomright)
 
-    ///Coordinaten instellen o.b.v. variabelen.
-    tlPoint.x = letter_location.x;
-    tlPoint.y = letter_location.y;
-    brPoint.x = letter_location.x + comp_size;
-    brPoint.y = letter_location.y + comp_size;
+    ///Coördinaten instellen o.b.v. de locatie van de letter en de width en height van de component.
+    double ratio = 0.5;             //Width en height vergroten met een factor 'ratio' om de zoek regio te vergroten.
+    int w2 = w + (ratio * w);
+    int h2 = h + (ratio * h);
+    tlPoint.x = letter_location.x - (w2/2);
+    tlPoint.y = letter_location.y - (h2/2);
+    brPoint.x = letter_location.x + (w2/2);
+    brPoint.y = letter_location.y + (h2/2);
 
     ///Zoek regio creeëren.
     region = Mat(src, Rect(tlPoint, brPoint));
@@ -205,8 +212,11 @@ Mat rotate_image(Mat src, float angle)
 int main(int argc, const char **argv)
 {
     cout << "Project: PCB bestukker." << endl;
-    bool setupCannyValues = true;
-    bool setupHoughLines = true;
+
+
+    bool setupCannyValues = false;
+    bool setupHoughLines = false;
+
 
     ///Setup CLP.
     CommandLineParser parser(argc, argv,
@@ -315,8 +325,7 @@ int main(int argc, const char **argv)
     }
 
 
-    /* Temporary in comment. (speed up development process)
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     for(int i=0; i<180; i=i+90)
     {
@@ -393,7 +402,7 @@ int main(int argc, const char **argv)
         waitKey(0);
     }
 
-    */
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     cout << "test" << endl;
 
@@ -415,8 +424,17 @@ int main(int argc, const char **argv)
     ///Get a region mask from the full mask based on the template matching.
     ///TODO: Change these hardcoded values. These should be based on the template matching locations and the size of the component.
     Point letter_location = Point(100,100);
-    int comp_size = 150;
-    Mat mask_region = search_region(mask_full, letter_location, comp_size);
+    //int comp_size = 150;
+    Mat resistor = imread("../../img/weerstand_10k.png");
+    imshow("resistor", resistor);
+    waitKey(0);
+    int comp_width = resistor.cols;
+    int comp_height = resistor.rows;
+
+    Mat mask_region = search_region(mask_full, letter_location, comp_width, comp_height);
+
+
+    cout << "hi" << endl;
 
     //debug
     imshow("mask_region", mask_region);
@@ -427,7 +445,7 @@ int main(int argc, const char **argv)
 
     //debug
     ///Visualize centerpoint
-     Mat mask_region_color = search_region(pcb, Point(100,100), 200);
+    Mat mask_region_color = search_region(pcb, letter_location, comp_width, comp_height);
     circle(mask_region_color, centerPoint, 5, Scalar(0,0,255), 5);
     imshow("centerpoint", mask_region_color);
     waitKey(0);
