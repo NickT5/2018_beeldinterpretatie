@@ -4,6 +4,9 @@
 using namespace std;
 using namespace cv;
 
+//int debugLevel; //Nice to have (to implement)
+bool debugOn = false;            ///If true, print and show more values/images.
+
 int threshold1;
 int alpha_slider_1 = 255;               //Stored value of trackbar.
 const int alpha_slider_max_1 = 255;     //Max value of trackbar.
@@ -65,7 +68,7 @@ static void on_trackbar3(int, void*){
 
 Point find_contour_center(Mat src, Mat mask)
 {
-    cout << "find_contour_center()..." << endl;
+    cout << "Find top left point of the contour..." << endl;
 
     Mat contourMap = Mat::zeros(src.rows, src.cols, CV_8UC3);   //Gevonden countours hierop tekenen.
     vector<vector<Point> > contours;                            //each detected contour is stored as a vector of points.
@@ -111,16 +114,18 @@ Point find_contour_center(Mat src, Mat mask)
 
 Mat create_mask(Mat src)
 {
-    cout << "create_mask()..." << endl;
+    cout << "Creating mask..." << endl;
 
     ///Create a black mask.
     Mat mask = Mat::zeros(src.rows, src.cols, CV_8UC1);
 
     ///Create a gray image of the PCB.
     Mat gray;
-    cvtColor( src.clone(), gray, COLOR_BGR2GRAY );
-    imshow("gray", gray);
-    waitKey(0);
+    cvtColor(src.clone(), gray, COLOR_BGR2GRAY);
+    if(debugOn){
+        imshow("gray", gray);
+        waitKey(0);
+    }
 
     ///Apply binary threshold.
     threshold(gray, mask, 150, 255, THRESH_BINARY);
@@ -132,27 +137,29 @@ Mat create_mask(Mat src)
     return mask;
 }
 
-Rect search_region(Mat src, Point letter_location, int w, int h)
+Rect search_region(Mat src, Point letterLocation, int w, int h)
 {
-    cout << "search_region()..." << endl;
+    cout << "Defining a search region..." << endl;
 
-    Mat region;                     ///Regio waar lijnen in gedetecteerd moeten worden.
-    Point tlPoint, brPoint;         ///Hoekpunten die een rechthoek definiëren. (topleft en bottomright)
+    //Mat region;                     ///Regio waar lijnen in gedetecteerd moeten worden.
+    Point tlPoint, brPoint;         ///Hoekpunten die een rechthoek (van de zoekregio) definiëren. (topleft en bottomright)
 
     ///Coördinaten instellen o.b.v. de locatie van de letter en de width en height van de component.
     double ratio = 0.5;             //Width en height vergroten met een factor 'ratio' om de zoekregio te vergroten.
     int w2 = w + (ratio * w);
     int h2 = h + (ratio * h);
-    tlPoint.x = letter_location.x - (w2/2);
-    tlPoint.y = letter_location.y - (h2/2);
-    brPoint.x = letter_location.x + (w2/2);
-    brPoint.y = letter_location.y + (h2/2);
+    tlPoint.x = letterLocation.x - (w2/2);
+    tlPoint.y = letterLocation.y - (h2/2);
+    brPoint.x = letterLocation.x + (w2/2);
+    brPoint.y = letterLocation.y + (h2/2);
 
     return Rect(tlPoint, brPoint);
 }
 
 void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour )
 {
+    cout << "Placing a resistor..." << endl;
+
     int x0 = pointRegion.x;       ///x-coord t.o.v. globale assenstelsel.
     int y0 = pointRegion.y;       ///y-coord t.o.v. globale assenstelsel.
 
@@ -217,6 +224,8 @@ Mat rotate_image(Mat src, float angle)
     return dst;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, const char **argv)
 {
     cout << "Project: PCB bestukker." << endl;
@@ -224,7 +233,6 @@ int main(int argc, const char **argv)
 
     bool setupCannyValues = false;
     bool setupHoughLines = false;
-
 
     ///Setup CLP.
     CommandLineParser parser(argc, argv,
@@ -252,7 +260,7 @@ int main(int argc, const char **argv)
     ///Create Mat objects for the images.
     vector<Mat> inputImages;
 
-    ///Read, empty check, (resize) and show the images.
+    ///Read, empty check, (resize), blur and show the images.
     for(int i=0;i<aantImages; i++)
     {
         inputImages.push_back(imread(imgNames[i]));                                             ///Read image.
@@ -301,7 +309,6 @@ int main(int argc, const char **argv)
 
             ///Exit loop via "Esc" button on keyboard.
             if (waitKey(1) == 27)   break;
-
         }
     }
     else
@@ -315,22 +322,22 @@ int main(int argc, const char **argv)
     if(setupHoughLines)
     {
         namedWindow("houghlines", WINDOW_AUTOSIZE);
-
         createTrackbar("threshold", "houghlines", &threshold_slider, threshold_slider_max, on_trackbar3 );
         createTrackbar("minLineLength", "houghlines", &minLineLength_slider, minLineLength_slider_max, on_trackbar3 );
         createTrackbar("maxLineGap", "houghlines", &maxLineGap_slider, maxLineGap_slider_max, on_trackbar3 );
         while(1)
         {
+            ///Show HoughLinesP result.
             imshow("houghlines", pcb_houghlines);
 
             ///Exit loop via "Esc" button on keyboard.
             if (waitKey(1) == 27)   break;
         }
-
     }
     else
     {
         cout << "Not using the trackbars to setup the houghlinesp parameters. (boolean is FALSE)" << endl;
+        cout << "Using the default values for HoughLinesP." << endl;
     }
 
 
@@ -398,36 +405,31 @@ int main(int argc, const char **argv)
             Point maxLoc;
             minMaxLoc(temp, NULL, NULL, NULL, &maxLoc);
 
-            ///Define the corners for the bounding box.
-            Point corner = Point(maxLoc.x + region.tl().x, maxLoc.y + region.tl().y);                               //nodig voor visualisatie
-            Point oppositeCorner = Point(maxLoc.x+region.tl().x+templ.cols, maxLoc.y+region.tl().y+templ.rows);     //nodig voor visualisatie
+            ///Define the corners for the bounding box. (Only for visualisation)
+            Point corner = Point(maxLoc.x + region.tl().x, maxLoc.y + region.tl().y);
+            Point oppositeCorner = Point(maxLoc.x+region.tl().x+templ.cols, maxLoc.y+region.tl().y+templ.rows);
 
             ///Get the (center)point of the letter.
             Point letterLocation = Point(maxLoc.x+region.tl().x+templ.cols/2, maxLoc.y+region.tl().y+templ.rows/2);
 
-            ///Draw the bounding box. (Enkel voor visualisatie).
+            ///Draw the bounding box. (Only for visualisation)
             rectangle(result_multi, corner, oppositeCorner, Scalar(0,0,255));
 
-            ///Visualisatie van de punten voor DEBUG
-            //circle(result_multi,maxLoc,5,Scalar(255,0,0),5);                //blauw
-            //circle(result_multi,region.tl(),5,Scalar(0,255,0),3);           //groen
-            //circle(result_multi,region.br(),5,Scalar(0,255,255),3);         //geel
+            ///Visualisatie van de punten voor DEBUG.
             circle(result_multi,corner,3,Scalar(255,0,255),3);                //violet
             circle(result_multi,oppositeCorner,3,Scalar(255,255,0),3);        //cyan
             circle(result_multi,letterLocation,3,Scalar(0,0,255),3);          //rood
 
-
-
             ///Nu weten we de locatie v/d letter. Dit gebruiken we om een regio te maken waar we moeten zoeken naar contouren.
-            cout << "letterLocation: x = " << letterLocation.x << " ; y = " << letterLocation.y << endl;
+            if(debugOn) cout << "letterLocation: x = " << letterLocation.x << " ; y = " << letterLocation.y << endl;
 
 
             ///Get a region of the full_mask based on the location of the letter and the width and height of the component.
             Rect rectRegion = search_region(mask_full, letterLocation, resistor_width, resistor_height);
 
             ///Debug print
-            cout << "rectRegion top left: x = " << rectRegion.tl().x << " ; y = " << rectRegion.tl().y << endl;
-            cout << "rectRegion bottom right: x = " << rectRegion.br().x << " ; y = " << rectRegion.br().y << endl;
+            if(debugOn) cout << "rectRegion top left: x = " << rectRegion.tl().x << " ; y = " << rectRegion.tl().y << endl;
+            if(debugOn) cout << "rectRegion bottom right: x = " << rectRegion.br().x << " ; y = " << rectRegion.br().y << endl;
 
             ///Cut a part from the full mask based on the rectangle region. (region around the letter).
             Mat mask_region = Mat(mask_full, rectRegion);
