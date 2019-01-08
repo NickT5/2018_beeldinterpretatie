@@ -4,8 +4,14 @@
 using namespace std;
 using namespace cv;
 
+/////////////////////////////////////////////////// GLOBAL VARIABLES //////////////////////////////////////////////////////////////////////
+
 //int debugLevel; //Nice to have (to implement)
 bool debugOn = false;            ///If true, print and show more values/images.
+Mat canny;
+Mat pcb_gray;
+Mat pcb_houghlines;
+Mat pcb_origneel;
 
 int threshold1;
 int alpha_slider_1 = 255;               //Stored value of trackbar.
@@ -14,11 +20,6 @@ const int alpha_slider_max_1 = 255;     //Max value of trackbar.
 int threshold2;
 int alpha_slider_2 = 255;               //Stored value of trackbar.
 const int alpha_slider_max_2 = 255;     //Max value of trackbar.
-
-Mat canny;
-Mat pcb_gray;
-Mat pcb_houghlines;
-Mat pcb_origneel;
 
 //Hough line variables:
 int th;
@@ -34,7 +35,7 @@ int maxLineGap_slider = 0;
 const int maxLineGap_slider_max = 255;
 //
 
-///Callback functions for the trackbars:
+/////////////////////////////////////////////////// CALLBACK FUNCTIONS //////////////////////////////////////////////////////////////////////
 static void on_trackbar1(int, void*){
     threshold1 = alpha_slider_1;
     Canny(pcb_gray, canny, threshold1, threshold2, 3, true);
@@ -65,17 +66,17 @@ static void on_trackbar3(int, void*){
 
 }
 
-
-Point find_contour_center(Mat src, Mat mask)
+/////////////////////////////////////////////////// NON-CALLBACK FUNCTIONS //////////////////////////////////////////////////////////////////////
+Point find_contour_center(Mat mask)
 {
     cout << "Find top left point of the contour..." << endl;
 
-    Mat contourMap = Mat::zeros(src.rows, src.cols, CV_8UC3);   //Gevonden countours hierop tekenen.
+    Mat contourMap = Mat::zeros(mask.rows, mask.cols, CV_8UC3);   //Gevonden countours hierop tekenen.
     vector<vector<Point> > contours;                            //each detected contour is stored as a vector of points.
     vector<Vec4i> hierarchy;                                    //contains info about img toplogy. Aantal even groot als aantal countours.
 
     ///findContours in the mask.
-    //8bit img, contours, hierarchy, mode, method, offset
+    //8bit img, contours, hierarchy, mode, method
     //mode: CV_RETR_EXTERNAL, CV_RETR_LIST, CV_RETR_CCOMP, CV_RETR_TREE
     //method: CV_CHAIN_APPROX_NONE, CV_CHAIN_APPROX_SIMPLE, ...
     findContours(mask.clone(), contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE);
@@ -89,8 +90,11 @@ Point find_contour_center(Mat src, Mat mask)
     }
 
     ///Show the contours.
-    imshow("Components (contours)", contourMap);
-    waitKey(0);
+    if(debugOn)
+    {
+        imshow("Components (contours)", contourMap);
+        waitKey(0);
+    }
 
 
     ///Find the largest blob.
@@ -103,13 +107,9 @@ Point find_contour_center(Mat src, Mat mask)
         }
     }
 
-    ///Find center of the largest blob.
+    ///Return the top left point of the largest blob.
     Rect br = boundingRect(grootste_blob);
-    Point centerPoint = Point(br.x+br.width/2, br.y+br.height/2);
-    Point topleftPoint = br.tl();
-
-    //return centerPoint;
-    return topleftPoint;
+    return br.tl();
 }
 
 Mat create_mask(Mat src)
@@ -122,16 +122,12 @@ Mat create_mask(Mat src)
     ///Create a gray image of the PCB.
     Mat gray;
     cvtColor(src.clone(), gray, COLOR_BGR2GRAY);
-    if(debugOn){
-        imshow("gray", gray);
-        waitKey(0);
-    }
 
     ///Apply binary threshold.
     threshold(gray, mask, 150, 255, THRESH_BINARY);
 
     ///Show the mask.
-    imshow("mask", mask);
+    imshow("Full mask", mask);
     waitKey(0);
 
     return mask;
@@ -141,7 +137,6 @@ Rect search_region(Mat src, Point letterLocation, int w, int h)
 {
     cout << "Defining a search region..." << endl;
 
-    //Mat region;                     ///Regio waar lijnen in gedetecteerd moeten worden.
     Point tlPoint, brPoint;         ///Hoekpunten die een rechthoek (van de zoekregio) definiëren. (topleft en bottomright)
 
     ///Coördinaten instellen o.b.v. de locatie van de letter en de width en height van de component.
@@ -153,6 +148,7 @@ Rect search_region(Mat src, Point letterLocation, int w, int h)
     brPoint.x = letterLocation.x + (w2/2);
     brPoint.y = letterLocation.y + (h2/2);
 
+    ///Return the region.
     return Rect(tlPoint, brPoint);
 }
 
@@ -166,7 +162,7 @@ void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour )
     int x1 = pointContour.x;       ///x-coord t.o.v. lokale assenstelsel.
     int y1 = pointContour.y;       ///y-coord t.o.v. lokale assenstelsel.
 
-    ///Define desired point coordinates (=top left point) where to place the component.
+    ///Define the desired point coordinates (=top left point) where to place the component.
     int x = x0 + x1;
     int y = y0 + y1;
 
@@ -177,31 +173,6 @@ void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour )
     //x and y is the coordinate of the top left corner.
     resistor.copyTo(dst(Rect(x, y, resistor.cols, resistor.rows)));
 
-}
-
-
-
-Mat get_line_mask(Mat src)
-{
-    Mat dst = src.clone();
-    Mat tmp = src.clone();
-
-    cvtColor(src, tmp, COLOR_BGR2GRAY);
-
-    Canny(tmp, dst, 50.0, 150.0, 3, true);
-
-    Mat color_dst;
-    cvtColor( dst, color_dst, COLOR_GRAY2BGR );
-
-    /*vector<Vec4i> lines;
-    HoughLinesP( dst, lines, 1, CV_PI/180, 80, 30, 10 );
-    for( size_t i = 0; i < lines.size(); i++ )
-    {
-        line( color_dst, Point(lines[i][0], lines[i][1]),
-        Point( lines[i][2], lines[i][3]), Scalar(0,0,255), 3, 8 );
-    }*/
-
-    return dst;
 }
 
 Mat rotate_image(Mat src, float angle)
@@ -224,11 +195,10 @@ Mat rotate_image(Mat src, float angle)
     return dst;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/////////////////////////////////////////////////// MAIN //////////////////////////////////////////////////////////////////////
 int main(int argc, const char **argv)
 {
-    cout << "Project: PCB bestukker." << endl;
+    cout << "Project: PCB bestukker!" << endl;
 
 
     bool setupCannyValues = false;
@@ -355,7 +325,7 @@ int main(int argc, const char **argv)
     {
         ///Rotate template image.
         Mat templ = rotate_image(original_templ.clone(),i);
-        imshow("r", templ);
+        imshow("(Rotated) Template", templ);
 
         ///Create Mat object for the result.
         Mat matchResult = Mat::zeros(pcb.rows, pcb.cols, CV_8UC1);
@@ -364,38 +334,54 @@ int main(int argc, const char **argv)
         //For SQDIFF is the min value the best match. For CCORR and CCOEFF is the max value the best match.
         int match_method[] = {CV_TM_SQDIFF, CV_TM_SQDIFF_NORMED, CV_TM_CCORR, CV_TM_CCORR_NORMED, CV_TM_CCOEFF, CV_TM_CCOEFF_NORMED};
         matchTemplate(pcb, templ, matchResult, match_method[5]);
-        //imshow("matchResult", matchResult);
-        //waitKey(0);
+        if(debugOn)
+        {
+            imshow("matchResult", matchResult);
+            waitKey(0);
+        }
 
         ///Normalize
         normalize( matchResult, matchResult, 0, 1, NORM_MINMAX, -1, Mat() );
-        //imshow("(normalized) matchResult", matchResult);
-        //waitKey(0);
+        if(debugOn)
+        {
+            imshow("(normalized) matchResult", matchResult);
+            waitKey(0);
+        }
 
         ///Threshold
         Mat mask = Mat::zeros(matchResult.rows, matchResult.cols, CV_8UC1);
         threshold(matchResult, mask, 0.75, 1, THRESH_BINARY);
-        imshow("Threshold mask", mask);
-        waitKey(0);
+        if(debugOn)
+        {
+            imshow("Threshold mask", mask);
+            waitKey(0);
+        }
 
-        ///Erosion + dilation)
+        ///Apply opening (erosion + dilation).
         erode(mask, mask, kernelErosion);
         dilate(mask, mask, kernelDilation);
-        imshow("Threshold mask after erosion and dilation", mask);
-        waitKey(0);
+        if(debugOn)
+        {
+            imshow("Threshold mask after erosion and dilation", mask);
+            waitKey(0);
+        }
 
         ///Convert [0;1] scale to [0;255]. (minMaxLoc expects a grayscale image as input.)
         mask.convertTo(mask,CV_8UC1);
         mask *= 255;
 
-        ///Search blobs with FindContours.
+        ///Search blobs with findContours.
         vector<vector<cv::Point> > contours;
         findContours(mask, contours, CV_RETR_EXTERNAL, CHAIN_APPROX_NONE);
 
-        ///Create Mat for the result with multiple bounding boxes.
+        ///Create Mat for the result with multiple bounding boxes (around the letter).
         Mat result_multi = inputImages[0].clone();
 
-        ///Draw a bounding box for each found contour.
+        ///Find the location of the letter,
+        /// define a search region around that letter,
+        /// search for the biggest blob in that region,
+        /// get coordinates from the biggest blob,
+        /// place a component.
         for(unsigned int i=0;i<contours.size();i++)
         {
             ///Search max in the regions of the contours.
@@ -420,6 +406,10 @@ int main(int argc, const char **argv)
             circle(result_multi,oppositeCorner,3,Scalar(255,255,0),3);        //cyan
             circle(result_multi,letterLocation,3,Scalar(0,0,255),3);          //rood
 
+             ///Show the bounding box around the letter.
+            imshow("Result with multiple bounding boxes", result_multi);
+            waitKey(0);
+
             ///Nu weten we de locatie v/d letter. Dit gebruiken we om een regio te maken waar we moeten zoeken naar contouren.
             if(debugOn) cout << "letterLocation: x = " << letterLocation.x << " ; y = " << letterLocation.y << endl;
 
@@ -427,7 +417,7 @@ int main(int argc, const char **argv)
             ///Get a region of the full_mask based on the location of the letter and the width and height of the component.
             Rect rectRegion = search_region(mask_full, letterLocation, resistor_width, resistor_height);
 
-            ///Debug print
+            ///Debug print.
             if(debugOn) cout << "rectRegion top left: x = " << rectRegion.tl().x << " ; y = " << rectRegion.tl().y << endl;
             if(debugOn) cout << "rectRegion bottom right: x = " << rectRegion.br().x << " ; y = " << rectRegion.br().y << endl;
 
@@ -435,79 +425,32 @@ int main(int argc, const char **argv)
             Mat mask_region = Mat(mask_full, rectRegion);
 
             ///Show the mask region around the letter.
-            imshow("mask region", mask_region);
-            waitKey(0);
+            if(debugOn)
+            {
+                imshow("mask region", mask_region);
+                waitKey(0);
+            }
 
             ///Detect contours and find the center of the biggest contour.
-            Point tlContour = find_contour_center(pcb, mask_region);        //local point
+            Point tlContour = find_contour_center(mask_region);        //a local point
 
-            //visualisatie
-            Mat mask_region_color = Mat(pcb, rectRegion);
-            circle(mask_region_color, tlContour, 2, Scalar(255,255,0), 2);
-            imshow("mask region_color", mask_region_color);
-            waitKey(0);
+            ///Only for visualisation.
+            if(debugOn)
+            {
+                Mat mask_region_color = Mat(pcb, rectRegion);
+                circle(mask_region_color, tlContour, 2, Scalar(255,255,0), 2);
+                imshow("mask region_color", mask_region_color);
+                waitKey(0);
+            }
 
+            ///Place a resistor on the correct location.
             put_resistor(pcb, pcb_bestukked, rectRegion.tl(), tlContour);
-            imshow("r", pcb_bestukked);
+            imshow("PCB bestukked", pcb_bestukked);
             waitKey(0);
-
         }
 
-        ///Show the result with all the detected objects.
-        imshow("Result with multiple bounding boxes", result_multi);
-        waitKey(0);
     }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    cout << "test" << endl;
-
-/*  Mat canny = get_line_mask(pcb);
-    imshow("canny", canny);
-    waitKey(0);
-  */
-
-
-/*  Mat pcb_bestukked;
-    put_resistor(pcb, pcb_bestukked, 0 ,0);
-    imshow("r", pcb_bestukked);
-    waitKey(0);
-*/
-
-
-/*
-    ///Create mask of the full pcb.
-    Mat mask_full = create_mask(pcb);
-
-    ///Get a region mask from the full mask based on the template matching.
-    ///TODO: Change these hardcoded values. These should be based on the template matching locations and the size of the component.
-    Point letter_location = Point(100,100);
-    //int comp_size = 150;
-    Mat resistor = imread("../../img/weerstand_10k.png");
-    imshow("resistor", resistor);
-    waitKey(0);
-    int comp_width = resistor.cols;
-    int comp_height = resistor.rows;
-
-    Mat mask_region = search_region(mask_full, letter_location, comp_width, comp_height);
-
-
-    cout << "hi" << endl;
-
-    //debug
-    imshow("mask_region", mask_region);
-    waitKey(0);
-
-    ///Detect countours and find the center of the biggest contour.
-    Point centerPoint = find_contour_center(pcb, mask_region);
-
-    //debug
-    ///Visualize centerpoint
-    Mat mask_region_color = search_region(pcb, letter_location, comp_width, comp_height);
-    circle(mask_region_color, centerPoint, 5, Scalar(0,0,255), 5);
-    imshow("centerpoint", mask_region_color);
-    waitKey(0);
-*/
 
     return 0;
 }
