@@ -1,5 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include <math.h>
 
 using namespace std;
 using namespace cv;
@@ -67,6 +68,27 @@ static void on_trackbar3(int, void*){
 }
 
 /////////////////////////////////////////////////// NON-CALLBACK FUNCTIONS //////////////////////////////////////////////////////////////////////
+double degree_to_rad(double angle)
+{
+    return (angle * M_PI / 180.0);         //Convert angle in degrees to angle in radians.
+}
+
+Point rotate_point(Point p1, double angle, Point p0)
+{
+    //p1 is the point to rotate.
+    //p0 is around which to be rotated.
+    Point p2;   //Point after rotation.
+
+    double a = degree_to_rad(angle);
+
+    ///Execute the transformation (translatie + rotatie).
+    p2.x = cos(a) * (p1.x - p0.x) - sin(a) * (p1.y - p0.y) + p0.x;
+    p2.y = sin(a) * (p1.x - p0.x) + cos(a) * (p1.y - p0.y) + p0.y;
+
+    ///Return the rotated point.
+    return p2;
+}
+
 Point find_contour_center(Mat mask)
 {
     cout << "Find top left point of the contour..." << endl;
@@ -133,7 +155,7 @@ Mat create_mask(Mat src)
     return mask;
 }
 
-Rect search_region(Mat src, Point letterLocation, int w, int h)
+Rect search_region(Mat src, Point letterLocation, int w, int h, double angle)
 {
     cout << "Defining a search region..." << endl;
 
@@ -147,6 +169,12 @@ Rect search_region(Mat src, Point letterLocation, int w, int h)
     tlPoint.y = letterLocation.y - (h2/2);
     brPoint.x = letterLocation.x + (w2/2);
     brPoint.y = letterLocation.y + (h2/2);
+
+    ///Voer een rotatie bewerking uit op de punten indien nodig.
+    if(angle != 0){
+        tlPoint = rotate_point(tlPoint, angle, letterLocation);
+        brPoint = rotate_point(brPoint, angle, letterLocation);
+    }
 
     ///Return the region.
     return Rect(tlPoint, brPoint);
@@ -175,7 +203,7 @@ void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour )
 
 }
 
-Mat rotate_image(Mat src, float angle)
+Mat rotate_image(Mat src, double angle)
 {
     /*
     //rotating a matrix with cropping.
@@ -270,6 +298,7 @@ int main(int argc, const char **argv)
 
     pcb_houghlines = pcb.clone();
     pcb_origneel = pcb.clone();
+    Mat result_multi = pcb.clone();    ///Create Mat for the result with multiple bounding boxes (around the letter).
 
 
     ///Setup canny threshold values:
@@ -327,10 +356,10 @@ int main(int argc, const char **argv)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    for(int i=0; i<180; i=i+90)
+    for(double angle=0; angle<180; angle=angle+90)
     {
         ///Rotate template image.
-        Mat templ = rotate_image(original_templ.clone(),i);
+        Mat templ = rotate_image(original_templ.clone(), angle);
         imshow("(Rotated) Template", templ);
 
         ///Create Mat object for the result.
@@ -380,9 +409,6 @@ int main(int argc, const char **argv)
         vector<vector<cv::Point> > contours;
         findContours(mask, contours, CV_RETR_EXTERNAL, CHAIN_APPROX_NONE);
 
-        ///Create Mat for the result with multiple bounding boxes (around the letter).
-        Mat result_multi = inputImages[0].clone();
-
         ///Find the location of the letter,
         /// define a search region around that letter,
         /// search for the biggest blob in that region,
@@ -390,33 +416,49 @@ int main(int argc, const char **argv)
         /// place a component.
         for(unsigned int i=0;i<contours.size();i++)
         {
-            ///Search max in the regions of the contours.
+            ///Get the bounding box rectangle around the contour.
             Rect region = boundingRect(contours[i]);
 
-            ///Define the corners for the bounding box. (Only for visualisation)
+            ///Define the corner coordinates for the bounding box. (Only for visualisation)
             Point corner = Point(region.tl().x, region.tl().y);
             Point oppositeCorner = Point(region.tl().x+templ.cols, region.tl().y+templ.rows);
 
-            ///Get the (center)point of the letter.
+            ///Get the (center)point of the letter. (center of the bounding box)
             Point letterLocation = Point(region.tl().x+templ.cols/2, region.tl().y+templ.rows/2);
 
             ///Draw the bounding box. (Only for visualisation)
             rectangle(result_multi, corner, oppositeCorner, Scalar(0,0,255));
 
-            ///Visualisatie van de punten voor DEBUG.
+            ///Draw the corners. (Only for visualisation)
             circle(result_multi,corner,2,Scalar(255,0,255),2);                //violet
             circle(result_multi,oppositeCorner,2,Scalar(255,255,0),2);        //cyan
             circle(result_multi,letterLocation,2,Scalar(0,0,255),2);          //rood
 
-             ///Show the bounding box around the letter.
+            ///Show the bounding box around the letter.
             imshow("Result with multiple bounding boxes", result_multi);
             waitKey(0);
 
+/*
+//test
+        corner = rotate_point(corner, angle, letterLocation);
+        oppositeCorner = rotate_point(oppositeCorner, angle, letterLocation);
+        letterLocation = rotate_point(letterLocation, angle, letterLocation);
+
+         ///Draw the corners. (Only for visualisation)
+        circle(result_multi,corner,2,Scalar(255,0,255),2);                //violet
+        circle(result_multi,oppositeCorner,2,Scalar(255,255,0),2);        //cyan
+        circle(result_multi,letterLocation,2,Scalar(0,0,255),2);          //rood
+
+        ///Show the bounding box around the letter.
+        imshow("Result with multiple bounding boxes", result_multi);
+        waitKey(0);
+//test
+*/
             ///Nu weten we de locatie v/d letter. Dit gebruiken we om een regio te maken waar we moeten zoeken naar contouren.
             if(debugOn) cout << "letterLocation: x = " << letterLocation.x << " ; y = " << letterLocation.y << endl;
 
             ///Get a region of the full_mask based on the location of the letter and the width and height of the component.
-            Rect rectRegion = search_region(mask_full, letterLocation, resistor_width, resistor_height);
+            Rect rectRegion = search_region(mask_full, letterLocation, resistor_width, resistor_height, angle);
 
             ///Debug print.
             if(debugOn) cout << "rectRegion top left: x = " << rectRegion.tl().x << " ; y = " << rectRegion.tl().y << endl;
