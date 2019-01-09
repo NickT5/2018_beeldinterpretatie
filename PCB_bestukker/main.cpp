@@ -7,7 +7,7 @@ using namespace cv;
 /////////////////////////////////////////////////// GLOBAL VARIABLES //////////////////////////////////////////////////////////////////////
 
 //int debugLevel; //Nice to have (to implement)
-bool debugOn = false;            ///If true, print and show more values/images.
+bool debugOn = true;            ///If true, print and show more values/images.
 Mat canny;
 Mat pcb_gray;
 Mat pcb_houghlines;
@@ -177,12 +177,17 @@ void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour )
 
 Mat rotate_image(Mat src, float angle)
 {
-  /*  Mat dst;
+    /*
+    //rotating a matrix with cropping.
+    Mat dst;
     Point2f src_center(src.cols/2.0F, src.rows/2.0F);
     Mat rotationMatrix = getRotationMatrix2D(src_center, angle, 1.0);
     warpAffine(src, dst, rotationMatrix, src.size());
     return dst;
     */
+
+    //rotating a matrix without cropping.
+    //source: https://github.com/milq/cvrotate2D/blob/master/cvrotate2D.cpp
     Mat dst;
     Point2f center(src.cols/2.0, src.rows/2.0);
     Mat rot = getRotationMatrix2D(center, angle, 1.0);
@@ -191,7 +196,8 @@ Mat rotate_image(Mat src, float angle)
     rot.at<double>(0,2) += bbox.width/2.0 - center.x;
     rot.at<double>(1,2) += bbox.height/2.0 - center.y;
 
-    warpAffine(src, dst, rot, bbox.size());
+    Size outputSize = bbox.size();
+    warpAffine(src, dst, rot, outputSize);
     return dst;
 }
 
@@ -321,7 +327,7 @@ int main(int argc, const char **argv)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    for(int i=0; i<90; i=i+90)
+    for(int i=0; i<180; i=i+90)
     {
         ///Rotate template image.
         Mat templ = rotate_image(original_templ.clone(),i);
@@ -386,25 +392,21 @@ int main(int argc, const char **argv)
         {
             ///Search max in the regions of the contours.
             Rect region = boundingRect(contours[i]);
-            Mat temp = mask(region);
-
-            Point maxLoc;
-            minMaxLoc(temp, NULL, NULL, NULL, &maxLoc);
 
             ///Define the corners for the bounding box. (Only for visualisation)
-            Point corner = Point(maxLoc.x + region.tl().x, maxLoc.y + region.tl().y);
-            Point oppositeCorner = Point(maxLoc.x+region.tl().x+templ.cols, maxLoc.y+region.tl().y+templ.rows);
+            Point corner = Point(region.tl().x, region.tl().y);
+            Point oppositeCorner = Point(region.tl().x+templ.cols, region.tl().y+templ.rows);
 
             ///Get the (center)point of the letter.
-            Point letterLocation = Point(maxLoc.x+region.tl().x+templ.cols/2, maxLoc.y+region.tl().y+templ.rows/2);
+            Point letterLocation = Point(region.tl().x+templ.cols/2, region.tl().y+templ.rows/2);
 
             ///Draw the bounding box. (Only for visualisation)
             rectangle(result_multi, corner, oppositeCorner, Scalar(0,0,255));
 
             ///Visualisatie van de punten voor DEBUG.
-            circle(result_multi,corner,3,Scalar(255,0,255),3);                //violet
-            circle(result_multi,oppositeCorner,3,Scalar(255,255,0),3);        //cyan
-            circle(result_multi,letterLocation,3,Scalar(0,0,255),3);          //rood
+            circle(result_multi,corner,2,Scalar(255,0,255),2);                //violet
+            circle(result_multi,oppositeCorner,2,Scalar(255,255,0),2);        //cyan
+            circle(result_multi,letterLocation,2,Scalar(0,0,255),2);          //rood
 
              ///Show the bounding box around the letter.
             imshow("Result with multiple bounding boxes", result_multi);
@@ -412,7 +414,6 @@ int main(int argc, const char **argv)
 
             ///Nu weten we de locatie v/d letter. Dit gebruiken we om een regio te maken waar we moeten zoeken naar contouren.
             if(debugOn) cout << "letterLocation: x = " << letterLocation.x << " ; y = " << letterLocation.y << endl;
-
 
             ///Get a region of the full_mask based on the location of the letter and the width and height of the component.
             Rect rectRegion = search_region(mask_full, letterLocation, resistor_width, resistor_height);
