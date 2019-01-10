@@ -178,19 +178,46 @@ Point find_contour_center(Mat mask)
     }
 
 
-    ///Find the largest blob.
+    ///Find the two largest blobs.
     vector<Point> grootste_blob = contours[0];
+    vector<Point> tweede_grootste_blob = contours[0];
     for(unsigned int i=0; i< contours.size(); i++)
     {
         if(contourArea(contours[i]) > contourArea(grootste_blob))
         {
             grootste_blob = contours[i];
         }
+        if(contourArea(contours[i]) > contourArea(tweede_grootste_blob) && contourArea(contours[i]) < contourArea(grootste_blob))
+        {
+            tweede_grootste_blob = contours[i];
+        }
     }
 
-    ///Return the top left point of the largest blob.
-    Rect br = boundingRect(grootste_blob);
-    return br.tl();
+    ///Use both contours if their area is approximatly the same.
+    double drempel = 80;
+    cout << " Area grootste blob: " << contourArea(grootste_blob);
+    cout << " Area 2de grootste blob: " << contourArea(tweede_grootste_blob);
+    if( (contourArea(grootste_blob) - contourArea(tweede_grootste_blob)) < drempel )
+    {
+        cout << "Blobs ongeveer even groot. Gebruik meeste linkse tl punt." << endl;
+        ///Use the most topleft point.
+        Point mostTopLeft;
+        Rect br1 = boundingRect(grootste_blob);
+        Rect br2 = boundingRect(tweede_grootste_blob);
+        if(br1.tl().x < br2.tl().x ){
+            return br1.tl();
+        }
+        else{
+            return br2.tl();
+        }
+    }
+    else{
+        cout << "Blobs niet ongeveer even groot." << endl;
+        ///Return the top left point of the largest blob.
+        Rect br = boundingRect(grootste_blob);
+        return br.tl();
+    }
+
 }
 
 Mat create_mask(Mat src)
