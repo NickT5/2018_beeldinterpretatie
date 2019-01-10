@@ -9,10 +9,46 @@ using namespace cv;
 
 //int debugLevel; //Nice to have (to implement)
 bool debugOn = true;            ///If true, print and show more values/images.
+bool fullMaskThreshold = true;
 Mat canny;
 Mat pcb_gray;
 Mat pcb_houghlines;
 Mat pcb_origneel;
+
+//filter green variables:
+Mat maskGreen;
+
+int hueLB;
+int hueLB_slider = 40;
+const int hueLB_slider_max = 180;
+
+int hueUB;
+int hueUB_slider = 80;
+const int hueUB_slider_max = 180;
+
+int satLB;
+int satLB_slider = 0;
+const int satLB_slider_max = 255;
+
+int satUB;
+int satUB_slider = 255;
+const int satUB_slider_max = 255;
+
+int valLB;
+int valLB_slider = 0;
+const int valLB_slider_max = 255;
+
+int valUB;
+int valUB_slider = 255;
+const int valUB_slider_max = 255;
+//
+
+//full mask var's:
+int fm_threshold;
+int fm_threshold_slider = 150;
+const int fm_threshold_slider_max = 255;
+//
+
 
 int threshold1;
 int alpha_slider_1 = 255;               //Stored value of trackbar.
@@ -66,6 +102,29 @@ static void on_trackbar3(int, void*){
     }
 
 }
+
+static void on_trackbar_hueLB(int, void*){
+    hueLB = hueLB_slider;
+}
+static void on_trackbar_hueUB(int, void*){
+    hueUB = hueUB_slider;
+}
+static void on_trackbar_satLB(int, void*){
+    satLB = satLB_slider;
+}
+static void on_trackbar_satUB(int, void*){
+    satUB = satUB_slider;
+}
+static void on_trackbar_valLB(int, void*){
+    valLB = valLB_slider;
+}
+static void on_trackbar_valUB(int, void*){
+    valUB = valUB_slider;
+}
+static void on_trackbar_full_mask(int, void*){
+    fm_threshold = fm_threshold_slider;
+}
+
 
 /////////////////////////////////////////////////// NON-CALLBACK FUNCTIONS //////////////////////////////////////////////////////////////////////
 double degree_to_rad(double angle)
@@ -145,13 +204,36 @@ Mat create_mask(Mat src)
     Mat gray;
     cvtColor(src.clone(), gray, COLOR_BGR2GRAY);
 
-    ///Apply binary threshold.
+//
+    if(fullMaskThreshold)
+    {
+        namedWindow("Full mask", WINDOW_AUTOSIZE);
+        createTrackbar("Threshold", "Full mask", &fm_threshold_slider, fm_threshold_slider_max, on_trackbar_full_mask );
+        while(1)
+        {
+            ///Apply binary threshold.
+            threshold(gray, mask, fm_threshold, 255, THRESH_BINARY);
+
+            ///Show the mask.
+            imshow("Full mask", mask);
+
+            ///Exit loop via "Esc" button on keyboard.
+            if (waitKey(1) == 27)   break;
+        }
+    }
+    else
+    {
+        cout << "Not using the trackbars to setup full mask threshold. (boolean is FALSE)" << endl;
+    }
+//
+
+/*    ///Apply binary threshold.
     threshold(gray, mask, 150, 255, THRESH_BINARY);
 
     ///Show the mask.
     imshow("Full mask", mask);
     waitKey(0);
-
+*/
     return mask;
 }
 
@@ -237,6 +319,8 @@ int main(int argc, const char **argv)
 
     bool setupCannyValues = false;
     bool setupHoughLines = false;
+    bool setupGreenFilter = true;
+
 
     ///Setup CLP.
     CommandLineParser parser(argc, argv,
@@ -299,7 +383,12 @@ int main(int argc, const char **argv)
     pcb_houghlines = pcb.clone();
     pcb_origneel = pcb.clone();
     Mat result_multi = pcb.clone();    ///Create Mat for the result with multiple bounding boxes (around the letter).
-
+    ///Convert to to HSV
+    Mat hsvImage = Mat::zeros(pcb.rows, pcb.cols, CV_8UC3);
+    cvtColor(pcb, hsvImage, CV_BGR2HSV);
+    ///Split in hsv channels.
+    vector<Mat> hsv;
+    split(hsvImage,hsv);
 
     ///Setup canny threshold values:
     if(setupCannyValues)
@@ -350,6 +439,46 @@ int main(int argc, const char **argv)
     Mat resistor = imread("../../img/weerstand_10k.png");
     int resistor_width = resistor.cols;
     int resistor_height = resistor.rows;
+
+    if(setupGreenFilter)
+    {
+        namedWindow("Filter color green", WINDOW_AUTOSIZE);
+        createTrackbar("hue lower", "Filter color green", &hueLB_slider, hueLB_slider_max, on_trackbar_hueLB );
+        createTrackbar("hue upper", "Filter color green", &hueUB_slider, hueUB_slider_max, on_trackbar_hueUB );
+        createTrackbar("sat lower", "Filter color green", &satLB_slider, satLB_slider_max, on_trackbar_satLB );
+        createTrackbar("sat upper", "Filter color green", &satUB_slider, satUB_slider_max, on_trackbar_satUB );
+        createTrackbar("val lower", "Filter color green", &valLB_slider, valLB_slider_max, on_trackbar_valLB );
+        createTrackbar("val upper", "Filter color green", &valUB_slider, valUB_slider_max, on_trackbar_valUB );
+
+        Mat maskHue = Mat::zeros(hsvImage.rows, hsvImage.cols, CV_8UC1);
+        Mat maskSat = Mat::zeros(hsvImage.rows, hsvImage.cols, CV_8UC1);
+        Mat maskVal = Mat::zeros(hsvImage.rows, hsvImage.cols, CV_8UC1);
+
+        while(1)
+        {
+            ///Apply the trackbar values.
+            inRange(hsv[0], hueLB, hueUB, maskHue);
+            inRange(hsv[1], satLB, satUB, maskSat);
+            inRange(hsv[2], valLB, valUB, maskVal);
+
+            ///De drie maskers combineren tot 1 masker:
+            Mat mask_combined = Mat::zeros(hsvImage.rows, hsvImage.cols, CV_8UC1);
+            mask_combined = maskHue & maskSat & maskVal;
+            ///Invert
+            mask_combined = 255 - mask_combined;
+
+            ///Show mask result.
+            imshow("Filter color green", mask_combined);
+
+            ///Exit loop via "Esc" button on keyboard.
+            if (waitKey(1) == 27)   break;
+        }
+    }
+    else
+    {
+        cout << "Not using the trackbars to setup the maskGreen parameters. (boolean is FALSE)" << endl;
+        cout << "Using the default values for maskGreen." << endl;
+    }
 
     ///Create mask of the full pcb.
     Mat mask_full = create_mask(pcb);
