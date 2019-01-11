@@ -5,6 +5,15 @@
 using namespace std;
 using namespace cv;
 
+/////////////////////////////////////////////////// FUNCTION DECLARATIONS /////////////////////////////////////////////////////////////////
+double degree_to_rad(double angle);
+Point rotate_point(Point p1, double angle, Point p0);
+Point find_contour_point(Mat mask);
+Mat create_mask(Mat src);
+Rect search_region(Mat src, Point letterLocation, int w, int h, double angle);
+void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour, double angle);
+Mat rotate_image(Mat src, double angle);
+
 /////////////////////////////////////////////////// GLOBAL VARIABLES //////////////////////////////////////////////////////////////////////
 
 //int debugLevel; //Nice to have (to implement)
@@ -148,7 +157,7 @@ Point rotate_point(Point p1, double angle, Point p0)
     return p2;
 }
 
-Point find_contour_center(Mat mask)
+Point find_contour_point(Mat mask)
 {
     cout << "Find top left point of the contour..." << endl;
 
@@ -173,7 +182,7 @@ Point find_contour_center(Mat mask)
     ///Show the contours.
     if(debugOn)
     {
-        imshow("Components (contours)", contourMap);
+        imshow("Contours of component", contourMap);
         waitKey(0);
     }
 
@@ -194,14 +203,12 @@ Point find_contour_center(Mat mask)
     }
 
     ///Use both contours if their area is approximatly the same.
+    if(debugOn) cout << " Area largest blob: " << contourArea(grootste_blob) << endl;
+    if(debugOn) cout << " Area 2nd largest blob: " << contourArea(tweede_grootste_blob) << endl;
     double drempel = 80;
-    cout << " Area grootste blob: " << contourArea(grootste_blob);
-    cout << " Area 2de grootste blob: " << contourArea(tweede_grootste_blob);
     if( (contourArea(grootste_blob) - contourArea(tweede_grootste_blob)) < drempel )
     {
-        cout << "Blobs ongeveer even groot. Gebruik meeste linkse tl punt." << endl;
-        ///Use the most topleft point.
-        Point mostTopLeft;
+        if(debugOn) cout << "Blobs approximatly the same. Use the most topleft point." << endl;
         Rect br1 = boundingRect(grootste_blob);
         Rect br2 = boundingRect(tweede_grootste_blob);
         if(br1.tl().x < br2.tl().x ){
@@ -212,7 +219,7 @@ Point find_contour_center(Mat mask)
         }
     }
     else{
-        cout << "Blobs niet ongeveer even groot." << endl;
+        cout << "Blobs not approximatly the same." << endl;
         ///Return the top left point of the largest blob.
         Rect br = boundingRect(grootste_blob);
         return br.tl();
@@ -289,7 +296,7 @@ Rect search_region(Mat src, Point letterLocation, int w, int h, double angle)
     return Rect(tlPoint, brPoint);
 }
 
-void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour )
+void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour, double angle)
 {
     cout << "Placing a resistor..." << endl;
 
@@ -305,6 +312,9 @@ void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour )
 
     ///Read resistor component.
     Mat resistor = imread("../../img/weerstand_10k.png");
+
+    ///Rotate image if nessecary.
+    if(angle != 0) resistor = rotate_image(resistor, angle);
 
     ///Place resistor on the PCB.
     //x and y is the coordinate of the top left corner.
@@ -631,7 +641,7 @@ int main(int argc, const char **argv)
             }
 
             ///Detect contours and find the center of the biggest contour.
-            Point tlContour = find_contour_center(mask_region);        //a local point
+            Point tlContour = find_contour_point(mask_region);        //a local point
 
             ///Only for visualisation.
             if(debugOn)
@@ -643,7 +653,7 @@ int main(int argc, const char **argv)
             }
 
             ///Place a resistor on the correct location.
-            put_resistor(pcb, pcb_bestukked, rectRegion.tl(), tlContour);
+            put_resistor(pcb, pcb_bestukked, rectRegion.tl(), tlContour, angle);
             imshow("PCB bestukked", pcb_bestukked);
             waitKey(0);
         }
