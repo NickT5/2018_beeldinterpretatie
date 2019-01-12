@@ -19,121 +19,20 @@ Mat rotate_image(Mat src, double angle);
 //int debugLevel; //Nice to have (to implement)
 bool debugOn = true;            ///If true, print and show more values/images.
 bool fullMaskThreshold = true;
-Mat canny;
+
 Mat pcb_gray;
-Mat pcb_houghlines;
 Mat pcb_origneel;
 
-//filter green variables:
-Mat maskGreen;
-
-int hueLB;
-int hueLB_slider = 40;
-const int hueLB_slider_max = 180;
-
-int hueUB;
-int hueUB_slider = 80;
-const int hueUB_slider_max = 180;
-
-int satLB;
-int satLB_slider = 0;
-const int satLB_slider_max = 255;
-
-int satUB;
-int satUB_slider = 255;
-const int satUB_slider_max = 255;
-
-int valLB;
-int valLB_slider = 0;
-const int valLB_slider_max = 255;
-
-int valUB;
-int valUB_slider = 255;
-const int valUB_slider_max = 255;
-//
-
-//full mask var's:
-int fm_threshold;
+//full mask variables:
+int fm_threshold = 150;
 int fm_threshold_slider = 150;
 const int fm_threshold_slider_max = 255;
 //
 
-
-int threshold1;
-int alpha_slider_1 = 255;               //Stored value of trackbar.
-const int alpha_slider_max_1 = 255;     //Max value of trackbar.
-
-int threshold2;
-int alpha_slider_2 = 255;               //Stored value of trackbar.
-const int alpha_slider_max_2 = 255;     //Max value of trackbar.
-
-//Hough line variables:
-int th;
-int threshold_slider = 80;
-const int threshold_slider_max = 255;
-
-int minLineLength;
-int minLineLength_slider = 5;
-const int minLineLength_slider_max = 255;
-
-int maxLineGap;
-int maxLineGap_slider = 0;
-const int maxLineGap_slider_max = 255;
-//
-
 /////////////////////////////////////////////////// CALLBACK FUNCTIONS //////////////////////////////////////////////////////////////////////
-static void on_trackbar1(int, void*){
-    threshold1 = alpha_slider_1;
-    Canny(pcb_gray, canny, threshold1, threshold2, 3, true);
-}
-
-static void on_trackbar2(int, void*){
-    threshold2 = alpha_slider_2;
-    Canny(pcb_gray, canny, threshold1, threshold2, 3, true);
-}
-
-static void on_trackbar3(int, void*){
-    pcb_houghlines = pcb_origneel.clone();   //'Refresh' the output.
-
-    ///Get values from the sliders.
-    vector<Vec4i> lines;
-    th = threshold_slider;
-    minLineLength = minLineLength_slider;
-    maxLineGap = maxLineGap_slider;
-
-    ///Apply HoughLinesP.
-    HoughLinesP( canny, lines, 0.5, CV_PI/360, th, minLineLength, maxLineGap );
-
-    ///Draw the lines.
-    for( size_t i = 0; i < lines.size(); i++ )
-    {
-        line( pcb_houghlines, Point(lines[i][0], lines[i][1]), Point( lines[i][2], lines[i][3]), Scalar(0,0,255), 2);
-    }
-
-}
-
-static void on_trackbar_hueLB(int, void*){
-    hueLB = hueLB_slider;
-}
-static void on_trackbar_hueUB(int, void*){
-    hueUB = hueUB_slider;
-}
-static void on_trackbar_satLB(int, void*){
-    satLB = satLB_slider;
-}
-static void on_trackbar_satUB(int, void*){
-    satUB = satUB_slider;
-}
-static void on_trackbar_valLB(int, void*){
-    valLB = valLB_slider;
-}
-static void on_trackbar_valUB(int, void*){
-    valUB = valUB_slider;
-}
 static void on_trackbar_full_mask(int, void*){
     fm_threshold = fm_threshold_slider;
 }
-
 
 /////////////////////////////////////////////////// NON-CALLBACK FUNCTIONS //////////////////////////////////////////////////////////////////////
 double degree_to_rad(double angle)
@@ -202,10 +101,10 @@ Point find_contour_point(Mat mask)
         }
     }
 
-    ///Use both contours if their area is approximatly the same.
+    ///Use both contours if their area is approximatly the same to get the most top left point.
     if(debugOn) cout << " Area largest blob: " << contourArea(grootste_blob) << endl;
     if(debugOn) cout << " Area 2nd largest blob: " << contourArea(tweede_grootste_blob) << endl;
-    double drempel = 80;
+    double drempel = 90;
     if( (contourArea(grootste_blob) - contourArea(tweede_grootste_blob)) < drempel )
     {
         if(debugOn) cout << "Blobs approximatly the same. Use the most topleft point." << endl;
@@ -219,7 +118,7 @@ Point find_contour_point(Mat mask)
         }
     }
     else{
-        cout << "Blobs not approximatly the same." << endl;
+        if(debugOn) cout << "Blobs not approximatly the same." << endl;
         ///Return the top left point of the largest blob.
         Rect br = boundingRect(grootste_blob);
         return br.tl();
@@ -229,7 +128,7 @@ Point find_contour_point(Mat mask)
 
 Mat create_mask(Mat src)
 {
-    cout << "Creating mask..." << endl;
+    cout << "Creating a mask of the PCB..." << endl;
 
     ///Create a black mask.
     Mat mask = Mat::zeros(src.rows, src.cols, CV_8UC1);
@@ -238,14 +137,14 @@ Mat create_mask(Mat src)
     Mat gray;
     cvtColor(src.clone(), gray, COLOR_BGR2GRAY);
 
-//
+    ///Use the trackbar to choose the threshold value if bool = true. Otherwise, use the default value.
     if(fullMaskThreshold)
     {
         namedWindow("Full mask", WINDOW_AUTOSIZE);
         createTrackbar("Threshold", "Full mask", &fm_threshold_slider, fm_threshold_slider_max, on_trackbar_full_mask );
         while(1)
         {
-            ///Apply binary threshold.
+            ///Apply binary threshold with value from trackbar.
             threshold(gray, mask, fm_threshold, 255, THRESH_BINARY);
 
             ///Show the mask.
@@ -257,23 +156,22 @@ Mat create_mask(Mat src)
     }
     else
     {
-        cout << "Not using the trackbars to setup full mask threshold. (boolean is FALSE)" << endl;
+        cout << "Not using the trackbar to setup full mask threshold. (boolean is FALSE)" << endl;
+        cout << "Using the default value." << endl;
+        ///Apply binary threshold with value from trackbar.
+        threshold(gray, mask, fm_threshold, 255, THRESH_BINARY);
+
+        ///Show the mask.
+        imshow("Full mask", mask);
+        waitKey(0);
     }
-//
 
-/*    ///Apply binary threshold.
-    threshold(gray, mask, 150, 255, THRESH_BINARY);
-
-    ///Show the mask.
-    imshow("Full mask", mask);
-    waitKey(0);
-*/
     return mask;
 }
 
 Rect search_region(Mat src, Point letterLocation, int w, int h, double angle)
 {
-    cout << "Defining a search region..." << endl;
+    cout << "Defining a search region around the letter..." << endl;
 
     Point tlPoint, brPoint;         ///Hoekpunten die een rechthoek (van de zoekregio) definiëren. (topleft en bottomright)
 
@@ -298,7 +196,7 @@ Rect search_region(Mat src, Point letterLocation, int w, int h, double angle)
 
 void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour, double angle)
 {
-    cout << "Placing a resistor..." << endl;
+    cout << "Placing a resistor on the PCB..." << endl;
 
     int x0 = pointRegion.x;       ///x-coord t.o.v. globale assenstelsel.
     int y0 = pointRegion.y;       ///y-coord t.o.v. globale assenstelsel.
@@ -352,11 +250,6 @@ Mat rotate_image(Mat src, double angle)
 int main(int argc, const char **argv)
 {
     cout << "Project: PCB bestukker!" << endl;
-
-
-    bool setupCannyValues = false;
-    bool setupHoughLines = false;
-    bool setupGreenFilter = true;
 
 
     ///Setup CLP.
@@ -414,108 +307,15 @@ int main(int argc, const char **argv)
     Mat original_templ = inputImages[1].clone();
     Mat pcb_bestukked = pcb.clone();
 
-    canny = pcb.clone();
     cvtColor(pcb.clone(), pcb_gray, COLOR_BGR2GRAY);
 
-    pcb_houghlines = pcb.clone();
     pcb_origneel = pcb.clone();
     Mat result_multi = pcb.clone();    ///Create Mat for the result with multiple bounding boxes (around the letter).
-    ///Convert to to HSV
-    Mat hsvImage = Mat::zeros(pcb.rows, pcb.cols, CV_8UC3);
-    cvtColor(pcb, hsvImage, CV_BGR2HSV);
-    ///Split in hsv channels.
-    vector<Mat> hsv;
-    split(hsvImage,hsv);
-
-    ///Setup canny threshold values:
-    if(setupCannyValues)
-    {
-        namedWindow("canny", WINDOW_AUTOSIZE);
-        createTrackbar("Threshold 1", "canny", &alpha_slider_1, alpha_slider_max_1, on_trackbar1 );
-        createTrackbar("Threshold 2", "canny", &alpha_slider_2, alpha_slider_max_2, on_trackbar2 );
-        while(1)
-        {
-            ///Show canny edge detection result.
-            imshow("canny", canny);
-
-            ///Exit loop via "Esc" button on keyboard.
-            if (waitKey(1) == 27)   break;
-        }
-    }
-    else
-    {
-        cout << "Not using the trackbars to setup the canny edge detection threshold values. (boolean is FALSE)" << endl;
-        cout << "Using the default values for Canny." << endl;
-        Canny(pcb_gray, canny, threshold1, threshold2, 3, true);
-    }
-
-
-    if(setupHoughLines)
-    {
-        namedWindow("houghlines", WINDOW_AUTOSIZE);
-        createTrackbar("threshold", "houghlines", &threshold_slider, threshold_slider_max, on_trackbar3 );
-        createTrackbar("minLineLength", "houghlines", &minLineLength_slider, minLineLength_slider_max, on_trackbar3 );
-        createTrackbar("maxLineGap", "houghlines", &maxLineGap_slider, maxLineGap_slider_max, on_trackbar3 );
-        while(1)
-        {
-            ///Show HoughLinesP result.
-            imshow("houghlines", pcb_houghlines);
-
-            ///Exit loop via "Esc" button on keyboard.
-            if (waitKey(1) == 27)   break;
-        }
-    }
-    else
-    {
-        cout << "Not using the trackbars to setup the houghlinesp parameters. (boolean is FALSE)" << endl;
-        cout << "Using the default values for HoughLinesP." << endl;
-    }
-
 
     ///Read component(s)
     Mat resistor = imread("../../img/weerstand_10k.png");
     int resistor_width = resistor.cols;
     int resistor_height = resistor.rows;
-
-    if(setupGreenFilter)
-    {
-        namedWindow("Filter color green", WINDOW_AUTOSIZE);
-        createTrackbar("hue lower", "Filter color green", &hueLB_slider, hueLB_slider_max, on_trackbar_hueLB );
-        createTrackbar("hue upper", "Filter color green", &hueUB_slider, hueUB_slider_max, on_trackbar_hueUB );
-        createTrackbar("sat lower", "Filter color green", &satLB_slider, satLB_slider_max, on_trackbar_satLB );
-        createTrackbar("sat upper", "Filter color green", &satUB_slider, satUB_slider_max, on_trackbar_satUB );
-        createTrackbar("val lower", "Filter color green", &valLB_slider, valLB_slider_max, on_trackbar_valLB );
-        createTrackbar("val upper", "Filter color green", &valUB_slider, valUB_slider_max, on_trackbar_valUB );
-
-        Mat maskHue = Mat::zeros(hsvImage.rows, hsvImage.cols, CV_8UC1);
-        Mat maskSat = Mat::zeros(hsvImage.rows, hsvImage.cols, CV_8UC1);
-        Mat maskVal = Mat::zeros(hsvImage.rows, hsvImage.cols, CV_8UC1);
-
-        while(1)
-        {
-            ///Apply the trackbar values.
-            inRange(hsv[0], hueLB, hueUB, maskHue);
-            inRange(hsv[1], satLB, satUB, maskSat);
-            inRange(hsv[2], valLB, valUB, maskVal);
-
-            ///De drie maskers combineren tot 1 masker:
-            Mat mask_combined = Mat::zeros(hsvImage.rows, hsvImage.cols, CV_8UC1);
-            mask_combined = maskHue & maskSat & maskVal;
-            ///Invert
-            mask_combined = 255 - mask_combined;
-
-            ///Show mask result.
-            imshow("Filter color green", mask_combined);
-
-            ///Exit loop via "Esc" button on keyboard.
-            if (waitKey(1) == 27)   break;
-        }
-    }
-    else
-    {
-        cout << "Not using the trackbars to setup the maskGreen parameters. (boolean is FALSE)" << endl;
-        cout << "Using the default values for maskGreen." << endl;
-    }
 
     ///Create mask of the full pcb.
     Mat mask_full = create_mask(pcb);
@@ -526,7 +326,7 @@ int main(int argc, const char **argv)
     {
         ///Rotate template image.
         Mat templ = rotate_image(original_templ.clone(), angle);
-        imshow("(Rotated) Template", templ);
+        if(debugOn) imshow("Template", templ);
 
         ///Create Mat object for the result.
         Mat matchResult = Mat::zeros(pcb.rows, pcb.cols, CV_8UC1);
@@ -567,7 +367,7 @@ int main(int argc, const char **argv)
             waitKey(0);
         }
 
-        ///Convert [0;1] scale to [0;255]. (minMaxLoc expects a grayscale image as input.)
+        ///Convert [0;1] scale to [0;255].
         mask.convertTo(mask,CV_8UC1);
         mask *= 255;
 
@@ -577,11 +377,13 @@ int main(int argc, const char **argv)
 
         ///Find the location of the letter,
         /// define a search region around that letter,
-        /// search for the biggest blob in that region,
-        /// get coordinates from the biggest blob,
-        /// place a component.
+        /// search for the two biggests blob in that region,
+        /// get coordinates from the blob(s),
+        /// place a component on the correct location.
         for(unsigned int i=0;i<contours.size();i++)
         {
+            cout << endl;
+
             ///Get the bounding box rectangle around the contour.
             Rect region = boundingRect(contours[i]);
 
@@ -604,22 +406,6 @@ int main(int argc, const char **argv)
             imshow("Result with multiple bounding boxes", result_multi);
             waitKey(0);
 
-/*
-//test
-        corner = rotate_point(corner, angle, letterLocation);
-        oppositeCorner = rotate_point(oppositeCorner, angle, letterLocation);
-        letterLocation = rotate_point(letterLocation, angle, letterLocation);
-
-         ///Draw the corners. (Only for visualisation)
-        circle(result_multi,corner,2,Scalar(255,0,255),2);                //violet
-        circle(result_multi,oppositeCorner,2,Scalar(255,255,0),2);        //cyan
-        circle(result_multi,letterLocation,2,Scalar(0,0,255),2);          //rood
-
-        ///Show the bounding box around the letter.
-        imshow("Result with multiple bounding boxes", result_multi);
-        waitKey(0);
-//test
-*/
             ///Nu weten we de locatie v/d letter. Dit gebruiken we om een regio te maken waar we moeten zoeken naar contouren.
             if(debugOn) cout << "letterLocation: x = " << letterLocation.x << " ; y = " << letterLocation.y << endl;
 
@@ -643,11 +429,11 @@ int main(int argc, const char **argv)
             ///Detect contours and find the center of the biggest contour.
             Point tlContour = find_contour_point(mask_region);        //a local point
 
-            ///Only for visualisation.
+            ///Only for visualisation. (show the point returned from find_contour_center() )
             if(debugOn)
             {
                 Mat mask_region_color = Mat(pcb, rectRegion);
-                circle(mask_region_color, tlContour, 2, Scalar(255,255,0), 2);
+                circle(mask_region_color, tlContour, 2, Scalar(255,255,0), 2);  //cyan
                 imshow("mask region_color", mask_region_color);
                 waitKey(0);
             }
