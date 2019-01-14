@@ -20,9 +20,6 @@ Mat rotate_image(Mat src, double angle);
 bool debugOn = true;            ///If true, print and show more values/images.
 bool fullMaskThreshold = true;
 
-Mat pcb_gray;
-Mat pcb_origneel;
-
 //full mask variables:
 int fm_threshold = 150;
 int fm_threshold_slider = 150;
@@ -58,7 +55,7 @@ Point rotate_point(Point p1, double angle, Point p0)
 
 Point find_contour_point(Mat mask)
 {
-    cout << "Find top left point of the contour..." << endl;
+    cout << "\t\tFind top left point of the (2) largest contour(s)." << endl;
 
     Mat contourMap = Mat::zeros(mask.rows, mask.cols, CV_8UC3);   //Gevonden countours hierop tekenen.
     vector<vector<Point> > contours;                            //each detected contour is stored as a vector of points.
@@ -102,12 +99,12 @@ Point find_contour_point(Mat mask)
     }
 
     ///Use both contours if their area is approximatly the same to get the most top left point.
-    if(debugOn) cout << " Area largest blob: " << contourArea(grootste_blob) << endl;
-    if(debugOn) cout << " Area 2nd largest blob: " << contourArea(tweede_grootste_blob) << endl;
+    if(debugOn) cout << "\t\tArea largest blob: " << contourArea(grootste_blob) << endl;
+    if(debugOn) cout << "\t\tArea 2nd largest blob: " << contourArea(tweede_grootste_blob) << endl;
     double drempel = 90;
     if( (contourArea(grootste_blob) - contourArea(tweede_grootste_blob)) < drempel )
     {
-        if(debugOn) cout << "Blobs approximatly the same. Use the most topleft point." << endl;
+        if(debugOn) cout << "\t\tBlobs approximatly the same. Use the most topleft point." << endl;
         Rect br1 = boundingRect(grootste_blob);
         Rect br2 = boundingRect(tweede_grootste_blob);
         if(br1.tl().x < br2.tl().x ){
@@ -118,7 +115,7 @@ Point find_contour_point(Mat mask)
         }
     }
     else{
-        if(debugOn) cout << "Blobs not approximatly the same." << endl;
+        if(debugOn) cout << "\t\tBlobs not approximatly the same." << endl;
         ///Return the top left point of the largest blob.
         Rect br = boundingRect(grootste_blob);
         return br.tl();
@@ -128,7 +125,7 @@ Point find_contour_point(Mat mask)
 
 Mat create_mask(Mat src)
 {
-    cout << "Creating a mask of the PCB..." << endl;
+    cout << "Creating a mask of the PCB." << endl;
 
     ///Create a black mask.
     Mat mask = Mat::zeros(src.rows, src.cols, CV_8UC1);
@@ -171,7 +168,7 @@ Mat create_mask(Mat src)
 
 Rect search_region(Mat src, Point letterLocation, int w, int h, double angle)
 {
-    cout << "Defining a search region around the letter..." << endl;
+    cout << "\t\tDefining a search region around the letter." << endl;
 
     Point tlPoint, brPoint;         ///Hoekpunten die een rechthoek (van de zoekregio) definiëren. (topleft en bottomright)
 
@@ -196,7 +193,7 @@ Rect search_region(Mat src, Point letterLocation, int w, int h, double angle)
 
 void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour, double angle)
 {
-    cout << "Placing a resistor on the PCB..." << endl;
+    cout << "\t\tPlacing a resistor on the PCB." << endl << endl;
 
     int x0 = pointRegion.x;       ///x-coord t.o.v. globale assenstelsel.
     int y0 = pointRegion.y;       ///y-coord t.o.v. globale assenstelsel.
@@ -256,7 +253,8 @@ int main(int argc, const char **argv)
     CommandLineParser parser(argc, argv,
         "{ help h |  | show this message         }"
         "{ image0 i   |  | (required) image path to the pcb image }"
-        "{ image1 j   |  | (required) image path to the template }"
+        "{ image1 j   |  | (required) image path to the resistor template }"
+        "{ image2 k   |  | (required) image path to the diode template }"
     );
 
     if(parser.has("help"))
@@ -285,7 +283,7 @@ int main(int argc, const char **argv)
         if(inputImages[i].empty()){ cerr << "One or more empty images!" << endl;  return -1;}   ///Empty check.
         //resize(inputImages[i],inputImages[i],Size(), 0.75, 0.75);                             ///Resize.
         GaussianBlur(inputImages[i], inputImages[i], Size(5,5),0);                              ///Gaussian blur.
-        string windowTitles[] = {"input image", "template image"};                              ///Window title.
+        string windowTitles[] = {"input image", "template resistor", "template diode"};         ///Window title.
         imshow(windowTitles[i], inputImages[i]);                                                ///Show image.
     }
     waitKey(0);
@@ -304,13 +302,18 @@ int main(int argc, const char **argv)
 
     ///Clone input images.
     Mat pcb = inputImages[0].clone();
-    Mat original_templ = inputImages[1].clone();
-    Mat pcb_bestukked = pcb.clone();
+    //Mat original_templ = inputImages[1].clone();
+    Mat template_resistor = inputImages[1].clone();
+    Mat template_diode = inputImages[2].clone();
 
-    cvtColor(pcb.clone(), pcb_gray, COLOR_BGR2GRAY);
+    ///Add all the templates to a vector of Mat's.
+    vector<Mat> allTemplates;
+    allTemplates.push_back(template_resistor);
+    //allTemplates.push_back(template_diode);
 
-    pcb_origneel = pcb.clone();
     Mat result_multi = pcb.clone();    ///Create Mat for the result with multiple bounding boxes (around the letter).
+    Mat pcb_bestukked = pcb.clone();   ///Mat for PCB with the components (=end result).
+
 
     ///Read component(s)
     Mat resistor = imread("../../img/weerstand_10k.png");
@@ -320,132 +323,145 @@ int main(int argc, const char **argv)
     ///Create mask of the full pcb.
     Mat mask_full = create_mask(pcb);
 
+    Mat original_templ;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    for(double angle=0; angle<180; angle=angle+90)
+    for(unsigned int t=0; t<allTemplates.size(); t++)
     {
-        ///Rotate template image.
-        Mat templ = rotate_image(original_templ.clone(), angle);
-        if(debugOn) imshow("Template", templ);
+        original_templ = allTemplates[t];
+        if(t == 0) cout << "Detecting and placing resistors..." << endl;
 
-        ///Create Mat object for the result.
-        Mat matchResult = Mat::zeros(pcb.rows, pcb.cols, CV_8UC1);
 
-        ///Template matching.
-        //For SQDIFF is the min value the best match. For CCORR and CCOEFF is the max value the best match.
-        int match_method[] = {CV_TM_SQDIFF, CV_TM_SQDIFF_NORMED, CV_TM_CCORR, CV_TM_CCORR_NORMED, CV_TM_CCOEFF, CV_TM_CCOEFF_NORMED};
-        matchTemplate(pcb, templ, matchResult, match_method[5]);
-        if(debugOn)
+        for(double angle=0; angle<180; angle=angle+90)
         {
-            imshow("matchResult", matchResult);
-            waitKey(0);
-        }
+            ///Rotate template image.
+            cout << "\tRotate template. (" << angle << "°)" << endl;
+            Mat templ = rotate_image(original_templ.clone(), angle);
+            if(debugOn) imshow("Template", templ);
 
-        ///Normalize
-        normalize( matchResult, matchResult, 0, 1, NORM_MINMAX, -1, Mat() );
-        if(debugOn)
-        {
-            imshow("(normalized) matchResult", matchResult);
-            waitKey(0);
-        }
+            ///Create Mat object for the result.
+            Mat matchResult = Mat::zeros(pcb.rows, pcb.cols, CV_8UC1);
 
-        ///Threshold
-        Mat mask = Mat::zeros(matchResult.rows, matchResult.cols, CV_8UC1);
-        threshold(matchResult, mask, 0.75, 1, THRESH_BINARY);
-        if(debugOn)
-        {
-            imshow("Threshold mask", mask);
-            waitKey(0);
-        }
-
-        ///Apply opening (erosion + dilation).
-        erode(mask, mask, kernelErosion);
-        dilate(mask, mask, kernelDilation);
-        if(debugOn)
-        {
-            imshow("Threshold mask after erosion and dilation", mask);
-            waitKey(0);
-        }
-
-        ///Convert [0;1] scale to [0;255].
-        mask.convertTo(mask,CV_8UC1);
-        mask *= 255;
-
-        ///Search blobs with findContours.
-        vector<vector<cv::Point> > contours;
-        findContours(mask, contours, CV_RETR_EXTERNAL, CHAIN_APPROX_NONE);
-
-        ///Find the location of the letter,
-        /// define a search region around that letter,
-        /// search for the two biggests blob in that region,
-        /// get coordinates from the blob(s),
-        /// place a component on the correct location.
-        for(unsigned int i=0;i<contours.size();i++)
-        {
-            cout << endl;
-
-            ///Get the bounding box rectangle around the contour.
-            Rect region = boundingRect(contours[i]);
-
-            ///Define the corner coordinates for the bounding box. (Only for visualisation)
-            Point corner = Point(region.tl().x, region.tl().y);
-            Point oppositeCorner = Point(region.tl().x+templ.cols, region.tl().y+templ.rows);
-
-            ///Get the (center)point of the letter. (center of the bounding box)
-            Point letterLocation = Point(region.tl().x+templ.cols/2, region.tl().y+templ.rows/2);
-
-            ///Draw the bounding box. (Only for visualisation)
-            rectangle(result_multi, corner, oppositeCorner, Scalar(0,0,255));
-
-            ///Draw the corners. (Only for visualisation)
-            circle(result_multi,corner,2,Scalar(255,0,255),2);                //violet
-            circle(result_multi,oppositeCorner,2,Scalar(255,255,0),2);        //cyan
-            circle(result_multi,letterLocation,2,Scalar(0,0,255),2);          //rood
-
-            ///Show the bounding box around the letter.
-            imshow("Result with multiple bounding boxes", result_multi);
-            waitKey(0);
-
-            ///Nu weten we de locatie v/d letter. Dit gebruiken we om een regio te maken waar we moeten zoeken naar contouren.
-            if(debugOn) cout << "letterLocation: x = " << letterLocation.x << " ; y = " << letterLocation.y << endl;
-
-            ///Get a region of the full_mask based on the location of the letter and the width and height of the component.
-            Rect rectRegion = search_region(mask_full, letterLocation, resistor_width, resistor_height, angle);
-
-            ///Debug print.
-            if(debugOn) cout << "rectRegion top left: x = " << rectRegion.tl().x << " ; y = " << rectRegion.tl().y << endl;
-            if(debugOn) cout << "rectRegion bottom right: x = " << rectRegion.br().x << " ; y = " << rectRegion.br().y << endl;
-
-            ///Cut a part from the full mask based on the rectangle region. (region around the letter).
-            Mat mask_region = Mat(mask_full, rectRegion);
-
-            ///Show the mask region around the letter.
+            ///Template matching.
+            //For SQDIFF is the min value the best match. For CCORR and CCOEFF is the max value the best match.
+            cout << "\tTemplate matching." << endl;
+            int match_method[] = {CV_TM_SQDIFF, CV_TM_SQDIFF_NORMED, CV_TM_CCORR, CV_TM_CCORR_NORMED, CV_TM_CCOEFF, CV_TM_CCOEFF_NORMED};
+            matchTemplate(pcb, templ, matchResult, match_method[5]);
             if(debugOn)
             {
-                imshow("mask region", mask_region);
+                imshow("matchResult", matchResult);
                 waitKey(0);
             }
 
-            ///Detect contours and find the center of the biggest contour.
-            Point tlContour = find_contour_point(mask_region);        //a local point
-
-            ///Only for visualisation. (show the point returned from find_contour_center() )
+            ///Normalize
+            normalize( matchResult, matchResult, 0, 1, NORM_MINMAX, -1, Mat() );
             if(debugOn)
             {
-                Mat mask_region_color = Mat(pcb, rectRegion);
-                circle(mask_region_color, tlContour, 2, Scalar(255,255,0), 2);  //cyan
-                imshow("mask region_color", mask_region_color);
+                imshow("(normalized) matchResult", matchResult);
                 waitKey(0);
             }
 
-            ///Place a resistor on the correct location.
-            put_resistor(pcb, pcb_bestukked, rectRegion.tl(), tlContour, angle);
-            imshow("PCB bestukked", pcb_bestukked);
-            waitKey(0);
+            ///Threshold
+            cout << "\tThreshold the template match result." << endl;
+            Mat mask = Mat::zeros(matchResult.rows, matchResult.cols, CV_8UC1);
+            threshold(matchResult, mask, 0.75, 1, THRESH_BINARY);
+            if(debugOn)
+            {
+                imshow("Threshold mask", mask);
+                waitKey(0);
+            }
+
+            ///Apply opening (erosion + dilation).
+            cout << "\tApply erosion and dilation." << endl;
+            erode(mask, mask, kernelErosion);
+            dilate(mask, mask, kernelDilation);
+            if(debugOn)
+            {
+                imshow("Threshold mask after erosion and dilation", mask);
+                waitKey(0);
+            }
+
+            ///Convert [0;1] scale to [0;255].
+            mask.convertTo(mask,CV_8UC1);
+            mask *= 255;
+
+            ///Search blobs with findContours.
+            cout << "\tSearch blobs (location of the letters)." << endl;
+            vector<vector<cv::Point> > contours;
+            findContours(mask, contours, CV_RETR_EXTERNAL, CHAIN_APPROX_NONE);
+            cout << "\tFound " << contours.size() << " blobs." << endl;
+
+            ///Find the location of the letter,
+            /// define a search region around that letter,
+            /// search for the two biggests blob in that region,
+            /// get coordinates from the blob(s),
+            /// place a component on the correct location.
+            for(unsigned int i=0;i<contours.size();i++)
+            {
+                ///Get the bounding box rectangle around the contour.
+                Rect region = boundingRect(contours[i]);
+
+                ///Define the corner coordinates for the bounding box. (Only for visualisation)
+                Point corner = Point(region.tl().x, region.tl().y);
+                Point oppositeCorner = Point(region.tl().x+templ.cols, region.tl().y+templ.rows);
+
+                ///Get the (center)point of the letter. (center of the bounding box)
+                Point letterLocation = Point(region.tl().x+templ.cols/2, region.tl().y+templ.rows/2);
+
+                ///Draw the bounding box. (Only for visualisation)
+                rectangle(result_multi, corner, oppositeCorner, Scalar(0,0,255));
+
+                ///Draw the corners. (Only for visualisation)
+                circle(result_multi,corner,2,Scalar(255,0,255),2);                //violet
+                circle(result_multi,oppositeCorner,2,Scalar(255,255,0),2);        //cyan
+                circle(result_multi,letterLocation,2,Scalar(0,0,255),2);          //rood
+
+                ///Show the bounding box around the letter.
+                imshow("Result with multiple bounding boxes", result_multi);
+                waitKey(0);
+
+                ///Nu weten we de locatie v/d letter. Dit gebruiken we om een regio te maken waar we moeten zoeken naar contouren.
+                //if(debugOn) cout << "\t\tletterLocation: x = " << letterLocation.x << " ; y = " << letterLocation.y << endl;
+
+                ///Get a region of the full_mask based on the location of the letter and the width and height of the component.
+                Rect rectRegion = search_region(mask_full, letterLocation, resistor_width, resistor_height, angle);
+
+                ///Debug print.
+                //if(debugOn) cout << "\t\trectRegion top left: x = " << rectRegion.tl().x << " ; y = " << rectRegion.tl().y << endl;
+                //if(debugOn) cout << "\t\trectRegion bottom right: x = " << rectRegion.br().x << " ; y = " << rectRegion.br().y << endl;
+
+                ///Cut a part from the full mask based on the rectangle region. (region around the letter).
+                cout << "\t\tCut a part from the full mask." << endl;
+                Mat mask_region = Mat(mask_full, rectRegion);
+
+                ///Show the mask region around the letter.
+                if(debugOn)
+                {
+                    imshow("mask region", mask_region);
+                    waitKey(0);
+                }
+
+                ///Detect contours and find the center of the biggest contour.
+                Point tlContour = find_contour_point(mask_region);        //a local point
+
+                ///Only for visualisation. (show the point returned from find_contour_center() )
+                if(debugOn)
+                {
+                    Mat mask_region_color = Mat(pcb, rectRegion);
+                    circle(mask_region_color, tlContour, 2, Scalar(255,255,0), 2);  //cyan
+                    imshow("mask region_color", mask_region_color);
+                    waitKey(0);
+                }
+
+                ///Place a resistor on the correct location.
+                put_resistor(pcb, pcb_bestukked, rectRegion.tl(), tlContour, angle);
+                imshow("PCB bestukked", pcb_bestukked);
+                waitKey(0);
+            }
+
         }
 
     }
-
 
     return 0;
 }

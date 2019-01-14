@@ -5,13 +5,11 @@ CONTENT:
 
 HOW TO RUN:
 	Go to the path "/PCB_bestukker/bin/Debug/" and run 
-./PCB_bestukker -i=../../img/pcb_1.jpg -j=../../img/template_R.png
-
-of
 
 ./PCB_bestukker -i=../../img/pcb_2.png -j=../../img/template_R_pcb2.png
 
 of
 
-./PCB_bestukker -i=../../img/pcb_3.png -j=../../img/template_R_pcb2.png
+./PCB_bestukker -i=../../img/pcb_2.png -j=../../img/template_R_pcb2.png -k=../../img/template_D_pcb2.png
+
 
