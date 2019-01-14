@@ -312,6 +312,7 @@ int main(int argc, const char **argv)
     //allTemplates.push_back(template_diode);
 
     Mat result_multi = pcb.clone();    ///Create Mat for the result with multiple bounding boxes (around the letter).
+    Mat result_multi_previous = result_multi.clone(); ///Keep the previous for when the user wants to reject a false postive (FP).
     Mat pcb_bestukked = pcb.clone();   ///Mat for PCB with the components (=end result).
 
 
@@ -408,6 +409,9 @@ int main(int argc, const char **argv)
                 ///Get the (center)point of the letter. (center of the bounding box)
                 Point letterLocation = Point(region.tl().x+templ.cols/2, region.tl().y+templ.rows/2);
 
+                ///Keep a copy of the previous if the user decides to reject.
+                result_multi_previous = result_multi.clone();
+
                 ///Draw the bounding box. (Only for visualisation)
                 rectangle(result_multi, corner, oppositeCorner, Scalar(0,0,255));
 
@@ -418,7 +422,25 @@ int main(int argc, const char **argv)
 
                 ///Show the bounding box around the letter.
                 imshow("Result with multiple bounding boxes", result_multi);
-                waitKey(0);
+                cout << "\t*** EXPECTING USER INPUT NOW ***" << endl;
+                cout << "\t*** Enter 'y' if you want to ACCEPT the letter detection or 'n' if you want to REJECT it ***" << endl;
+                char acceptOrReject;            //accept = 'Y' , reject = 'N'.
+                acceptOrReject = waitKey(0);
+                if(acceptOrReject == 'y'){           //89 is the ascii code for the letter 'Y'.
+                    cout << "\tUser chose to ACCEPT." << endl;
+                    result_multi_previous = result_multi;
+                }
+                else if(acceptOrReject == 'n'){
+                    //User's choice was 'N', so reject.
+                    //Overwrite the current with the previous and continue to the next iteration loop.
+                    cout << "\tUser chose to REJECT." << endl;
+                    result_multi = result_multi_previous;
+                    imshow("Result with multiple bounding boxes", result_multi);
+                    continue;
+                }
+                else{
+                    //Do something when something else besides 'Y' or 'N' is entered.
+                }
 
                 ///Nu weten we de locatie v/d letter. Dit gebruiken we om een regio te maken waar we moeten zoeken naar contouren.
                 //if(debugOn) cout << "\t\tletterLocation: x = " << letterLocation.x << " ; y = " << letterLocation.y << endl;
@@ -463,5 +485,7 @@ int main(int argc, const char **argv)
 
     }
 
+    cout << "Press any key to close the program." << endl;
+    waitKey(0);
     return 0;
 }
