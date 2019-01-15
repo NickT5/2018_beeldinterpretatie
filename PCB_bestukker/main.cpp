@@ -205,6 +205,11 @@ void put_resistor(Mat src, Mat &dst, Point pointRegion, Point pointContour, doub
     int x = x0 + x1;
     int y = y0 + y1;
 
+    ///Mini correctiefactor voor het plaatsen van de weerstand.
+    int correctionFactor = 3;
+    if(angle != 0) x += correctionFactor;
+    else y += correctionFactor;
+
     ///Read resistor component.
     Mat resistor = imread("../../img/weerstand_10k.png");
 
